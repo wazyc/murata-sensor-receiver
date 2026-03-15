@@ -1,0 +1,44 @@
+---
+alwaysApply: true
+---
+
+# 村田センサー受信システム - プロジェクト構造ガイド
+
+## ライブラリとしての使用方法 
+このプロジェクトはPyPIパッケージとして設計されており、他のシステムに組み込んで使用します。使用例は [examples/](mdc:examples/) ディレクトリを参照してください。
+
+## コアモジュール構成 
+
+### 1. murata_sensor パッケージ (src/murata_sensor/)
+- **[src/murata_sensor/__init__.py](mdc:src/murata_sensor/__init__.py)**: パッケージの初期化、主要クラスをエクスポート
+- **[src/murata_sensor/murata_receiver.py](mdc:src/murata_sensor/murata_receiver.py)**: `MurataReceiver`クラス - UDP受信とセンサーデータ管理の中核
+- **[src/murata_sensor/murata_sensor.py](mdc:src/murata_sensor/murata_sensor.py)**: `MurataSensorBase`とセンサー固有クラス群 - データ解析処理
+- **[src/murata_sensor/murata_exception.py](mdc:src/murata_sensor/murata_exception.py)**: カスタム例外クラス群
+
+### 2. 使用例・テスト
+- **[examples/simple_stdout.py](mdc:examples/simple_stdout.py)**: 基本的な使用方法（UDP受信→標準出力）
+- **[examples/async_receiver.py](mdc:examples/async_receiver.py)**: 非同期受信（AsyncMurataReceiver）
+- **[examples/threaded_receiver.py](mdc:examples/threaded_receiver.py)**: スレッド実行（run_in_thread）
+- **[examples/debug_sender.py](mdc:examples/debug_sender.py)**: デバッグ用テストデータ送信
+- **[tests/test_murata_sensor.py](mdc:tests/test_murata_sensor.py)**: テストケース
+
+### 3. 設計書
+- **[docs/overview.md](mdc:docs/overview.md)**: プロジェクト概要・関連ドキュメント一覧
+- **[docs/architecture.md](mdc:docs/architecture.md)**: システムアーキテクチャ設計書
+- **[docs/api_specification.md](mdc:docs/api_specification.md)**: API仕様書
+
+## 基本データフロー 
+1. UDP受信 ([murata_receiver.py](mdc:src/murata_sensor/murata_receiver.py))
+2. データ解析 ([murata_sensor.py](mdc:src/murata_sensor/murata_sensor.py))  
+3. センサー固有処理 (各センサークラス)
+4. データ格納・管理 (メモリ内、将来的にはDB)
+
+## 重要な設計パターン 
+- **Factory Pattern**: センサータイプに応じたインスタンス生成
+- **Template Method**: 共通解析フローと固有処理の分離
+- **Strategy Pattern**: センサータイプ別解析戦略
+
+## 新機能追加時の指針 
+1. 新しいセンサータイプ: [murata_sensor.py](mdc:src/murata_sensor/murata_sensor.py)に新クラス追加
+2. 新しい受信処理: [murata_receiver.py](mdc:src/murata_sensor/murata_receiver.py)を拡張
+3. テスト: [tests/](mdc:tests/)ディレクトリに追加

@@ -1,0 +1,454 @@
+---
+description: ライブラリ設計とAPI設計のベストプラクティス
+---
+
+# ライブラリ設計ガイドライン
+
+## ライブラリ設計の基本原則
+
+### 1. 明確な責任分離
+```python
+# 良い例: 各モジュールが明確な責任を持つ
+# murata_receiver.py - UDP受信とデータ管理に特化
+# murata_sensor.py - データ解析とセンサー固有処理に特化
+# murata_exception.py - 例外定義に特化
+
+# 避ける: 複数の責任を持つクラス
+class BadExample:
+    def __init__(self):
+        self.socket = None      # ネットワーク
+        self.database = None    # データ永続化
+        self.parser = None      # データ解析
+        # 複数の責任を持つのは保守性が低い
+```
+
+### 2. 使いやすいAPI設計
+
+#### コンストラクタのベストプラクティス
+```python
+class MurataReceiver:
+    def __init__(self, port: int, buffer_size: int = 1024,
+                 data_callback: Optional[Callable] = None,
+                 error_callback: Optional[Callable] = None,
+                 logger: Optional[logging.Logger] = None):
+        """
+        柔軟な初期化オプションを提供
+
+        Args:
+            port: 必須のポート番号
+            buffer_size: オプションのバッファサイズ（デフォルト値あり）
+            data_callback: オプションのデータ処理コールバック
+            error_callback: オプションのエラー処理コールバック
+            logger: オプションのカスタムロガー
+        """
+```
+
+#### メソッドの設計原則
+```python
+def recv(self) -> None:
+    """シンプルで明確なメソッド名と機能"""
+    pass
+
+def get_latest_data(self, addr: tuple) -> Optional[Dict]:
+    """明確な戻り値の型とNone可能性の明示"""
+    pass
+
+# 避ける: 曖昧なメソッド名や機能
+def process():  # 何をするのか不明確
+def handle():   # 汎用的すぎる名前
+```
+
+## コールバックアーキテクチャの設計 
+
+### 1. コールバック関数の標準化 
+```python
+# データ処理コールバックの標準形式
+def data_callback(sensor_data: Dict[str, Any], addr: Tuple[str, int]) -> None:
+    """
+    Args:
+        sensor_data: 処理済みセンサーデータ
+        addr: 送信元アドレス (ip, port)
+    """
+    pass
+
+# エラー処理コールバックの標準形式
+def error_callback(error: Exception, raw_data: bytes, addr: Tuple[str, int]) -> None:
+    """
+    Args:
+        error: 発生した例外
+        raw_data: 生のUDPパケットデータ
+        addr: 送信元アドレス (ip, port)
+    """
+    pass
+```
+
+### 2. センサーデータ形式の標準化
+```python
+# 標準化されたセンサーデータ構造
+sensor_data = {
+    'sensor_type': str,           # センサータイプ名
+    'timestamp': str,            # ISO形式のタイムスタンプ
+    'values': Dict[str, Any],    # センサー固有の測定値
+    'info': Dict[str, Any],      # センサー情報（RSSI、ユニットID等）
+    'addr': Tuple[str, int]      # 送信元アドレス
+}
+
+# センサー値の構造化
+values = {
+    'temperature': {
+        'value': 25.3,
+        'unit': '°C',
+        'unit_name': '摂氏'
+    },
+    'humidity': {
+        'value': 60.2,
+        'unit': '%',
+        'unit_name': 'パーセント'
+    }
+}
+```
+
+## エラーハンドリングのベストプラクティス 
+
+### 1. カスタム例外の設計
+```python
+class MurataExceptionBase(Exception):
+    """プロジェクト固有の例外基底クラス"""
+
+    def __init__(self, message: str = "", details: str = ""):
+        self.message = message
+        self.details = details
+        super().__init__(self.message)
+
+class FailedCheckSum(MurataExceptionBase):
+    """チェックサム検証失敗時の例外"""
+    pass
+
+class FailedCheckSumPayload(MurataExceptionBase):
+    """ペイロードチェックサム検証失敗時の例外"""
+    pass
+```
+
+### 2. グレースフルなエラーハンドリング
+```python
+def make_sensor(self, data: bytes, addr) -> Optional[MurataSensorBase]:
+    """センサーインスタンス生成時のエラーハンドリング"""
+    try:
+        return self._create_sensor_instance(sensor_type, data, addr)
+    except (FailedCheckSum, FailedCheckSumPayload) as e:
+        # チェックサムエラーはログ出力して継続（グレースフル）
+        self.logger.warning(f"Data validation error from {addr}: {e}")
+        return None
+    except Exception as e:
+        # 予期しないエラーもログ出力して継続
+        self.logger.error(f"Unexpected error from {addr}: {e}")
+        return None
+```
+
+## パフォーマンス最適化ガイドライン
+
+### 1. メモリ効率の考慮
+```python
+# 大量データの処理時はメモリ効率を考慮
+class OptimizedSensorData:
+    __slots__ = ['timestamp', 'values', 'rssi']  # メモリ使用量削減
+
+    def __init__(self, timestamp, values, rssi):
+        self.timestamp = timestamp
+        self.values = values
+        self.rssi = rssi
+
+# 履歴データの効率的な管理
+def get_sensor_history_iter(self, addr: tuple):
+    """メモリ効率的な履歴データアクセス（イテレータ使用）"""
+    for data in self.sensors.get(addr, []):
+        yield data
+```
+
+### 2. ログ出力の最適化
+```python
+# デバッグログは条件付きで出力
+if self.logger.isEnabledFor(logging.DEBUG):
+    self.logger.debug(f"詳細データ: {expensive_operation()}")
+
+# 構造化ログを使用した効率的な出力
+self.logger.info("センサーデータ受信", extra={
+    'sensor_type': sensor_data['sensor_type'],
+    'addr': addr,
+    'rssi': sensor_data['info']['RSSI']
+})
+```
+
+## APIの一貫性と後方互換性
+
+### 1. APIの一貫性確保
+```python
+# 全センサークラスで共通のインターフェースを提供
+class MurataSensorBase:
+    def __init__(self, data: bytes, addr: tuple):
+        """共通の初期化インターフェース"""
+        pass
+
+    def retrieve_values(self) -> None:
+        """共通の値取得インターフェース"""
+        pass
+
+# 各センサークラスで同じ構造を維持
+class VibrationSensor(MurataSensorBase):
+    def retrieve_values(self) -> None:
+        """振動センサー固有の処理"""
+        self.values = {
+            'vibration_x': {...},
+            'vibration_y': {...},
+            'vibration_z': {...}
+        }
+```
+
+### 2. 後方互換性の維持
+```python
+# 新機能追加時の後方互換性確保
+class MurataReceiver:
+    def __init__(self, port: int, buffer_size: int = 1024, **kwargs):
+        """
+        **kwargsで将来の拡張性を確保
+
+        Args:
+            port: 必須パラメータ
+            buffer_size: オプション（デフォルト値あり）
+            **kwargs: 将来の拡張用パラメータ
+        """
+        self.port = port
+        self.buffer_size = buffer_size
+
+        # 将来の拡張パラメータを処理
+        data_callback = kwargs.get('data_callback')
+        error_callback = kwargs.get('error_callback')
+        logger = kwargs.get('logger')
+```
+
+## ドキュメンテーションのベストプラクティス
+
+### 1. 包括的なドキュメンテーション
+```python
+class MurataReceiver:
+    """
+    村田製作所製センサーからのUDPデータ受信を行うクラス
+
+    このクラスはUDPパケットを受信し、センサーデータを解析して
+    コールバック関数を介して外部システムに提供します。
+
+    主な機能:
+    - UDPパケットの継続的な受信
+    - 複数センサータイプの自動識別と処理
+    - コールバックによる柔軟なデータ処理
+    - エラーハンドリングとログ出力
+
+    使用例:
+        def data_handler(sensor_data, addr):
+            print(f"受信データ: {sensor_data}")
+
+        receiver = MurataReceiver(port=55039, data_callback=data_handler)
+        receiver.recv()
+    """
+
+    def __init__(self, port: int, buffer_size: int = 1024,
+                 data_callback: Optional[Callable] = None,
+                 error_callback: Optional[Callable] = None,
+                 logger: Optional[logging.Logger] = None):
+        """
+        MurataReceiverを初期化します。
+
+        Args:
+            port: 受信ポート番号（必須）
+            buffer_size: 受信バッファサイズ（オプション、デフォルト: 1024）
+            data_callback: データ受信時のコールバック関数（オプション）
+            error_callback: エラー発生時のコールバック関数（オプション）
+            logger: カスタムロガーインスタンス（オプション）
+
+        Raises:
+            OSError: ソケット作成・バインドに失敗した場合
+            ValueError: パラメータが無効な場合
+        """
+```
+
+### 2. 型ヒントの徹底
+```python
+from typing import Dict, List, Optional, Tuple, Callable, Any, Union
+from datetime import datetime
+
+def get_latest_data(self, addr: Tuple[str, int]) -> Optional[Dict[str, Any]]:
+    """型ヒントによる明確なインターフェース定義"""
+    pass
+
+def recv(self) -> None:
+    """戻り値なしの明確な指定"""
+    pass
+```
+
+## テスト容易性の確保
+
+### 1. 依存性の注入
+```python
+class MurataReceiver:
+    def __init__(self, port: int, buffer_size: int = 1024,
+                 data_callback: Optional[Callable] = None,
+                 error_callback: Optional[Callable] = None,
+                 logger: Optional[logging.Logger] = None,
+                 socket_factory: Optional[Callable] = None):
+        """
+        テスト容易性のための依存性注入
+
+        Args:
+            socket_factory: テスト用のソケットファクトリ関数（オプション）
+        """
+        self.socket_factory = socket_factory or self._default_socket_factory
+
+    def _default_socket_factory(self):
+        """デフォルトのソケット作成"""
+        return socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+```
+
+### 2. テスト用のヘルパーメソッド
+```python
+class MurataReceiver:
+    def _setup_socket(self):
+        """テストでモック可能なソケット設定"""
+        self.sock = self.socket_factory()
+        self.sock.bind(("0.0.0.0", self.port))
+
+    def _process_sensor_data(self, addr: Tuple[str, int], sensor: MurataSensorBase):
+        """テストでオーバーライド可能なデータ処理"""
+        sensor_data = self._convert_sensor_to_dict(sensor)
+        if self.data_callback:
+            self.data_callback(sensor_data, addr)
+```
+
+## セキュリティ考慮事項
+
+### 1. データ検証の徹底
+```python
+def _validate_sensor_data(self, data: bytes) -> bool:
+    """センサーデータの妥当性検証"""
+    if len(data) < MIN_PACKET_SIZE:
+        return False
+
+    # データサイズチェック
+    if not self._check_data_size(data):
+        return False
+
+    # チェックサム検証
+    if not self._check_data():
+        return False
+
+    return True
+```
+
+### 2. リソース管理の徹底
+```python
+class MurataReceiver:
+    def __enter__(self):
+        """コンテキストマネージャサポート"""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """リソースの適切なクリーンアップ"""
+        if hasattr(self, 'sock'):
+            self.sock.close()
+
+    def close(self):
+        """明示的なリソース解放"""
+        if hasattr(self, 'sock'):
+            self.sock.close()
+        self.logger.info("MurataReceiverを終了しました")
+```
+
+## 将来の拡張性確保
+
+### 1. プラグインアーキテクチャの準備
+```python
+# センサータイプ登録システムの準備
+class SensorRegistry:
+    """センサータイプの動的登録システム"""
+    def __init__(self):
+        self.sensor_classes = {}
+
+    def register_sensor_type(self, sensor_type: str, sensor_class: type):
+        """新しいセンサータイプを登録"""
+        self.sensor_classes[sensor_type] = sensor_class
+
+    def create_sensor(self, sensor_type: str, data: bytes, addr) -> Optional[MurataSensorBase]:
+        """登録されたセンサータイプからインスタンスを生成"""
+        sensor_class = self.sensor_classes.get(sensor_type)
+        if sensor_class:
+            return sensor_class(data, addr)
+        return None
+```
+
+### 2. 設定管理の準備
+```python
+# 設定クラスの準備（将来の外部設定ファイル対応）
+class MurataReceiverConfig:
+    """レシーバー設定管理クラス"""
+    def __init__(self):
+        self.port = 55039
+        self.buffer_size = 1024
+        self.log_level = logging.INFO
+        self.data_callback = None
+        self.error_callback = None
+
+    @classmethod
+    def from_dict(cls, config_dict: Dict[str, Any]) -> 'MurataReceiverConfig':
+        """辞書から設定を生成"""
+        config = cls()
+        for key, value in config_dict.items():
+            if hasattr(config, key):
+                setattr(config, key, value)
+        return config
+
+    @classmethod
+    def from_yaml(cls, yaml_path: str) -> 'MurataReceiverConfig':
+        """YAMLファイルから設定を読み込み"""
+        # 将来の実装
+        pass
+```
+
+## 品質指標とメトリクス
+
+### 1. コード品質指標
+- **テストカバレッジ**: 80%以上を目指す
+- **循環的複雑度**: 各関数で10未満を目指す
+- **コード重複率**: 5%未満を目指す
+- **技術的負債**: 定期的なリファクタリングで管理
+
+### 2. パフォーマンス指標
+- **メモリ使用量**: 大量データ処理時の効率化
+- **CPU使用率**: 不要な処理の削減
+- **レスポンスタイム**: リアルタイム処理の確保
+- **スループット**: パケット処理数の最適化
+
+### 3. 保守性指標
+- **ドキュメント充足率**: 公開APIの100%ドキュメント化
+- **API安定性**: 後方互換性の維持期間定義
+- **変更容易性**: 新機能追加のしやすさ
+- **問題解決時間**: バグ修正の迅速性
+
+## 継続的改善プロセス
+
+### 1. 定期レビュー項目
+- [ ] APIの使いやすさ評価
+- [ ] パフォーマンスボトルネックの特定
+- [ ] セキュリティ脆弱性の確認
+- [ ] ユーザーからのフィードバック分析
+- [ ] 新技術・ベストプラクティスの導入検討
+
+### 2. リファクタリングガイドライン
+- **機能追加時**: 既存コードへの影響を最小限に
+- **バグ修正時**: 根本原因の分析と予防措置の実施
+- **パフォーマンス改善時**: ベンチマークによる効果測定
+- **API変更時**: 後方互換性の明確なドキュメント化
+
+### 3. 技術的負債管理
+- **負債の可視化**: 定期的なコードレビューで特定
+- **優先度付け**: 影響度と緊急度による分類
+- **計画的な返済**: リリースサイクルでの対応計画
+- **予防措置**: 設計段階での品質確保

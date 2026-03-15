@@ -1,0 +1,193 @@
+---
+globs: *.py
+---
+
+# Python コーディング規約 
+
+## 基本方針 
+このプロジェクトはPEP 8に準拠し、以下の追加規約に従ってください。
+
+## コメントとドキュメント 
+
+### 1. クラスと関数のドキュメント
+```python
+class MurataSensorBase:
+    """
+    村田製作所製センサーの基底クラス
+    
+    センサーデータの受信と解析を行う基本機能を提供。
+    
+    Attributes:
+        data (bytes): 受信した電文データ
+        info (dict): センサー情報を格納する辞書
+    """
+    
+    def __init__(self, data: bytes, addr: tuple = (None, None)):
+        """
+        Args:
+            data: 受信した電文
+            addr: IPアドレスとポート番号 ('xxx.xxx.xxx.xxx', 9999)
+        
+        Raises:
+            FailedCheckSum: 電文全体のチェックサムが不正な場合
+        """
+```
+
+### 2. 日本語コメント規約
+- 重要な処理には日本語コメントを併記
+- 変数名・関数名は英語、説明は日本語でも可
+- ファイル先頭に目的と概要を記載
+
+## 例外処理 
+
+### カスタム例外の使用
+```python
+try:
+    sensor = MurataSensorBase(data, addr)
+except FailedCheckSum as e:
+    logger.error(f"チェックサムエラー: {e}")
+except FailedCheckSumPayload as e:
+    logger.error(f"ペイロードエラー: {e}")
+
+```
+
+## ロギング 
+
+### 統一されたログ形式
+```python
+import logging
+
+logger = logging.getLogger(__name__)
+
+# 適切なログレベル使用
+logger.info("センサーデータ受信開始")  # 一般情報
+logger.warning("チェックサム検証失敗")  # 警告
+logger.error("センサーデータ解析エラー")  # エラー
+logger.debug(f"受信データ: {data}")  # デバッグ情報
+```
+
+## データ型と型ヒント 
+
+### 必須の型ヒント
+```python
+from typing import Optional, Dict, List, Tuple, Union
+
+def get_latest_data(self, addr: tuple) -> Optional[Dict]:
+    """戻り値の型を明確に指定"""
+    pass
+
+def make_sensor(self, data: bytes, addr: tuple) -> Optional[MurataSensorBase]:
+    """クラス型も明確に指定"""
+    pass
+```
+
+## センサーデータ処理の規約 
+
+### 1. チェックサム検証
+```python
+def _validate_checksums(self):
+    """チェックサムの検証を行う"""
+    if not self._check_data():
+        raise FailedCheckSum()
+    if self.payload_length % 8 != 0 and not self._check_payload():
+        raise FailedCheckSumPayload()
+```
+
+### 2. センサータイプ判定
+```python
+# SENSOR_TYPE辞書を使用した判定
+sensor_type_code = payload[:8].decode()
+if sensor_type_code in SENSOR_TYPE:
+    sensor_type = SENSOR_TYPE[sensor_type_code]
+else:
+    logger.warning(f"未知のセンサータイプ: {sensor_type_code}")
+    return None
+```
+
+### 3. データ変換パターン
+```python
+# 16進数文字列から数値への変換
+def hex_to_int(hex_str: str) -> int:
+    """16進数文字列を整数に変換"""
+    return int(hex_str, 16)
+
+# RSSI値計算（プロジェクト固有）
+rssi_hex = data[23:25].decode()
+rssi_value = int(rssi_hex, 16) - 107
+```
+
+## エラーハンドリングパターン 
+
+### 1. グレースフルな劣化
+```python
+def make_sensor(self, data: bytes, addr) -> Optional[MurataSensorBase]:
+    try:
+        # センサーインスタンス生成試行
+        return self._create_sensor_instance(sensor_type, data, addr)
+    except (FailedCheckSum, FailedCheckSumPayload) as e:
+        logger.warning(f"センサーデータ検証エラー: {e}")
+        return None  # Noneを返してシステム継続
+    except Exception as e:
+        logger.error(f"予期しないエラー: {e}")
+        return None
+```
+
+### 2. リソース管理
+```python
+# UDPソケットの適切な管理
+def recv(self):
+    try:
+        while True:
+            data, addr = self.sock.recvfrom(self.buffer_size)
+            # 処理...
+    except KeyboardInterrupt:
+        logger.info("受信停止")
+    finally:
+        if hasattr(self, 'sock'):
+            self.sock.close()
+```
+
+## 命名規約 
+
+### 変数・関数名
+- `snake_case`を使用
+- 意味のある名前を付ける
+- 略語は避ける（`addr`は例外として許可）
+
+### クラス名
+- `PascalCase`を使用
+- センサー関連: `XxxSensor`形式
+- 例外関連: `XxxException`または`XxxError`形式
+
+### 定数
+- `UPPER_SNAKE_CASE`を使用
+- モジュールレベルで定義
+
+```python
+# 良い例
+SENSOR_TYPE = {...}
+DEFAULT_PORT = 55039
+BUFFER_SIZE = 1024
+
+# 避ける
+sensorType = {...}  # camelCase
+default_port = 55039  # 小文字（変数と区別がつかない）
+```
+
+## パフォーマンス考慮事項 
+
+### 1. メモリ効率
+```python
+# 大量データの処理時はgeneratorを使用
+def get_sensor_history_iter(self, addr: tuple):
+    """メモリ効率的な履歴データアクセス"""
+    for data in self.sensors.get(addr, []):
+        yield data
+```
+
+### 2. ログ出力の最適化
+```python
+# デバッグログは条件付きで出力
+if logger.isEnabledFor(logging.DEBUG):
+    logger.debug(f"詳細データ: {expensive_operation()}")
+```

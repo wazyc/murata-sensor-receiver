@@ -1,0 +1,351 @@
+---
+globs: tests/*.py,test_*.py,*_test.py
+description: テストコード作成とテスト戦略に関するガイドライン
+---
+
+# テストガイドライン 
+
+## テスト戦略 
+
+### 1. テストピラミッド 
+```
+    🔺 E2Eテスト 
+   🔺🔺 統合テスト  
+  🔺🔺🔺 単体テスト 
+```
+
+### 2. テストの優先順位 
+1. **センサーデータ解析ロジック**: データ変換・チェックサム検証
+2. **UDP通信処理**: パケット受信・エラーハンドリング
+3. **センサーファクトリ**: センサータイプ判定・インスタンス生成
+4. **データ管理**: 履歴保存・最新データ取得
+
+## 単体テスト規約 
+
+### 1. テストファイル構成 
+```
+tests/
+├── test_murata_sensor.py       # センサー基底クラスのテスト
+├── test_murata_receiver.py     # 受信機能のテスト
+├── test_sensor_types/          # 各センサータイプのテスト
+│   ├── test_vibration_sensor.py
+│   ├── test_temperature_sensor.py
+│   └── test_current_sensor.py
+├── test_exceptions.py          # 例外処理のテスト
+└── fixtures/                   # テストデータ
+    ├── sensor_data_samples.py
+    └── udp_packets.py
+```
+
+### 2. テストクラス命名規約 
+```python
+# 良い例 
+class TestMurataSensorBase:
+    """MurataSensorBaseクラスのテスト"""
+    
+class TestVibrationSensor:
+    """VibrationSensorクラスのテスト"""
+    
+class TestMurataReceiver:
+    """MurataReceiverクラスのテスト"""
+
+# 避ける
+class MurataSensorTest:  # "Test"は先頭に付ける
+class TestMurata:        # クラス名が不明確
+```
+
+### 3. テストメソッド命名規約 
+```python
+def test_正常系_機能名_期待結果(self):
+    """正常系テストの命名例"""
+    pass
+
+def test_異常系_エラー条件_期待される例外(self):
+    """異常系テストの命名例"""  
+    pass
+
+# 具体例
+def test_正常系_チェックサム検証_成功(self):
+    """正常なデータでチェックサム検証が成功することを確認"""
+    
+def test_異常系_不正チェックサム_FailedCheckSum例外(self):
+    """不正なチェックサムでFailedCheckSum例外が発生することを確認"""
+```
+
+## センサーテストのパターン 
+
+### 1. データ駆動テスト 
+```python
+import pytest
+from tests.fixtures.sensor_data_samples import VIBRATION_SAMPLES
+
+class TestVibrationSensor:
+    @pytest.mark.parametrize("sample_data, expected_values", VIBRATION_SAMPLES)
+    def test_vibration_data_parsing(self, sample_data, expected_values):
+        """振動センサーデータの解析テスト"""
+        sensor = VibrationSensor(sample_data, ('127.0.0.1', 55039))
+        
+        assert sensor.values is not None
+        assert sensor.values['vibration_x'] == expected_values['vibration_x']
+        assert sensor.values['vibration_y'] == expected_values['vibration_y']
+        assert sensor.values['vibration_z'] == expected_values['vibration_z']
+```
+
+### 2. テストデータ管理 
+```python
+# tests/fixtures/sensor_data_samples.py
+TEMPERATURE_HUMIDITY_VALID = [
+    (
+        b"ERXDATA 0002 0000 62BE F000 18 20 030301FF012605320C90052A11AF052C7C0002 7FFF",
+        {
+            'temperature': 25.3,
+            'humidity': 60.2,
+            'voltage': 3.2
+        }
+    ),
+    # 追加のテストケース...
+]
+
+INVALID_CHECKSUM_DATA = [
+    b"ERXDATA 0002 0000 62BE F000 18 20 030301FF012605320C90052A11AF052C7C0099 7FFF",
+    # 不正なチェックサムのテストデータ
+]
+```
+
+### 3. モックとスタブ 
+```python
+import unittest.mock as mock
+import socket
+
+class TestMurataReceiver:
+    @mock.patch('socket.socket')
+    def test_udp_receive_success(self, mock_socket):
+        """UDP受信の正常系テスト"""
+        # モックの設定
+        mock_sock_instance = mock_socket.return_value
+        mock_sock_instance.recvfrom.return_value = (
+            b"ERXDATA...", ('192.168.1.100', 55039)
+        )
+        
+        # テスト実行
+        receiver = MurataReceiver(55039)
+        # 受信処理のテスト...
+        
+        # 検証
+        mock_socket.assert_called_once_with(socket.AF_INET, socket.SOCK_DGRAM)
+        mock_sock_instance.bind.assert_called_once_with(('', 55039))
+```
+
+## 統合テスト 
+
+### 1. エンドツーエンドテスト 
+```python
+class TestSensorSystemIntegration:
+    def test_full_sensor_data_flow(self):
+        """センサーデータの完全なフローテスト"""
+        # 1. レシーバー起動
+        receiver = MurataReceiver(55039)
+        
+        # 2. テストデータ送信
+        test_sender = UdpTestSender()
+        test_sender.send_vibration_data()
+        
+        # 3. データ受信・解析確認
+        time.sleep(0.1)  # 受信待機
+        
+        # 4. 結果検証
+        sensors = receiver.sensors
+        assert len(sensors) > 0
+        
+        latest_data = receiver.get_latest_data(('127.0.0.1', 11111))
+        assert latest_data is not None
+        assert 'vibration_x' in latest_data['values']
+```
+
+### 2. 複数センサータイプテスト 
+```python
+def test_multiple_sensor_types_handling():
+    """複数のセンサータイプの同時処理テスト"""
+    receiver = MurataReceiver(55039)
+    
+    # 異なるタイプのセンサーデータを送信
+    test_data = [
+        TEMPERATURE_HUMIDITY_DATA,
+        VIBRATION_DATA,
+        CURRENT_PULSE_DATA
+    ]
+    
+    for data in test_data:
+        # データ送信・受信
+        pass
+    
+    # 全てのセンサータイプが正しく処理されたことを確認
+    assert len(receiver.sensors) == len(test_data)
+```
+
+## エラーハンドリングテスト 
+
+### 1. 例外テスト 
+```python
+class TestSensorExceptions:
+    def test_invalid_checksum_raises_exception(self):
+        """不正なチェックサムで例外が発生することを確認"""
+        invalid_data = b"ERXDATA...invalid_checksum..."
+        
+        with pytest.raises(FailedCheckSum) as exc_info:
+            MurataSensorBase(invalid_data, ('127.0.0.1', 55039))
+        
+        assert "Failed to validate message checksum" in str(exc_info.value)
+    
+    def test_payload_checksum_error(self):
+        """ペイロードチェックサムエラーのテスト"""
+        invalid_payload_data = b"ERXDATA...invalid_payload..."
+        
+        with pytest.raises(FailedCheckSumPayload):
+            MurataSensorBase(invalid_payload_data, ('127.0.0.1', 55039))
+```
+
+### 2. グレースフルな劣化テスト 
+```python
+def test_receiver_continues_after_sensor_error():
+    """センサーエラー発生後もレシーバーが継続することを確認"""
+    receiver = MurataReceiver(55039)
+    
+    # 不正なデータを送信
+    invalid_data = b"INVALID_DATA"
+    result = receiver.make_sensor(invalid_data, ('127.0.0.1', 55039))
+    
+    # Noneが返されることを確認（システムは継続）
+    assert result is None
+    
+    # 正常なデータも処理できることを確認
+    valid_data = TEMPERATURE_HUMIDITY_VALID[0][0]
+    result = receiver.make_sensor(valid_data, ('127.0.0.1', 55039))
+    assert result is not None
+```
+
+## パフォーマンステスト 
+
+### 1. 負荷テスト 
+```python
+import time
+import threading
+
+def test_high_frequency_data_processing():
+    """高頻度データ処理のパフォーマンステスト"""
+    receiver = MurataReceiver(55039)
+    
+    # 大量のデータを短時間で送信
+    start_time = time.time()
+    
+    for i in range(1000):
+        test_data = generate_test_sensor_data(i)
+        receiver.make_sensor(test_data, ('127.0.0.1', 55039 + i))
+    
+    end_time = time.time()
+    processing_time = end_time - start_time
+    
+    # パフォーマンス要件: 1秒あたり100パケット以上処理
+    assert processing_time < 10.0  # 1000パケットを10秒以内
+    assert len(receiver.sensors) == 1000
+```
+
+### 2. メモリ使用量テスト 
+```python
+import psutil
+import gc
+
+def test_memory_usage_with_large_history():
+    """大量の履歴データでのメモリ使用量テスト"""
+    process = psutil.Process()
+    initial_memory = process.memory_info().rss
+    
+    receiver = MurataReceiver(55039)
+    
+    # 大量のデータを蓄積
+    for i in range(10000):
+        test_data = generate_test_sensor_data(i)
+        receiver.make_sensor(test_data, ('127.0.0.1', 55039))
+    
+    gc.collect()  # ガベージコレクション実行
+    final_memory = process.memory_info().rss
+    memory_increase = (final_memory - initial_memory) / 1024 / 1024  # MB
+    
+    # メモリ使用量が許容範囲内であることを確認
+    assert memory_increase < 100  # 100MB以下
+```
+
+## テストユーティリティ 
+
+### 1. テストデータ生成 
+```python
+def generate_test_sensor_data(sensor_type: str, custom_values: dict = None) -> bytes:
+    """テスト用センサーデータの生成"""
+    base_templates = {
+        'vibration': "ERXDATA 1115 0000 0464 F000 4D 7A 03030900...",
+        'temperature_humidity': "ERXDATA 0002 0000 62BE F000 18 20 030301FF...",
+        'current_pulse': "ERXDATA B07C 0000 3D3C F000 4D 3A 030310FF..."
+    }
+    
+    template = base_templates.get(sensor_type, base_templates['vibration'])
+    
+    # カスタム値でテンプレートを更新
+    if custom_values:
+        # テンプレートにカスタム値を適用
+        pass
+    
+    return template.encode('utf-8')
+```
+
+### 2. アサーションヘルパー 
+```python
+def assert_sensor_data_valid(sensor_data: dict, sensor_type: str):
+    """センサーデータの妥当性を包括的にチェック"""
+    assert sensor_data is not None
+    assert 'values' in sensor_data
+    assert 'RSSI' in sensor_data
+    assert 'addr' in sensor_data
+    
+    values = sensor_data['values']
+    
+    # センサータイプ固有の検証
+    if sensor_type == 'vibration':
+        required_fields = ['vibration_x', 'vibration_y', 'vibration_z']
+        for field in required_fields:
+            assert field in values
+            assert isinstance(values[field], (int, float))
+    
+    elif sensor_type == 'temperature_humidity':
+        assert 'temperature' in values
+        assert 'humidity' in values
+        assert -40 <= values['temperature'] <= 85  # 温度範囲チェック
+        assert 0 <= values['humidity'] <= 100     # 湿度範囲チェック
+```
+
+## 継続的インテグレーション 
+
+### 1. テスト実行設定 
+```yaml
+# pytest.ini
+[tool:pytest]
+testpaths = tests
+python_files = test_*.py *_test.py
+python_classes = Test*
+python_functions = test_*
+addopts = 
+    --verbose
+    --tb=short
+    --cov=murata_sensor
+    --cov-report=html
+    --cov-report=term
+```
+
+### 2. テストカバレッジ要件 
+```python
+# 最低カバレッジ要件
+MINIMUM_COVERAGE = {
+    'murata_sensor/murata_sensor.py': 90,      # コアロジック
+    'murata_sensor/murata_receiver.py': 85,    # 受信処理
+    'murata_sensor/murata_exception.py': 100,  # 例外処理
+}
+```

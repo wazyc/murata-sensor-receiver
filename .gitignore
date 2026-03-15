@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Project specific
+*.log
+*.sqlite3
+.coverage
+htmlcov/
+.pytest_cache/
+
+# PyPI packaging
+build/
+dist/
+*.egg-info/
+.tox/
+.wheel/
+
+# Development
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Example databases
+examples/*.db
+examples/*.sqlite3
+
+#sample files
+sample_data_files/
+
+# confidential files
+docs/confidential/

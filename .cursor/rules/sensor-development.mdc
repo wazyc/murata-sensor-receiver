@@ -1,0 +1,240 @@
+---
+description: センサー開発とデータ処理に関するガイドライン
+---
+
+# センサー開発ガイドライン 
+
+## 新しいセンサータイプの追加 
+
+### 1. センサータイプの登録
+[murata_sensor/murata_sensor.py](mdc:murata_sensor/murata_sensor.py)の`SENSOR_TYPE`辞書に新しいセンサーを追加：
+
+```python
+SENSOR_TYPE = {
+    # 既存のセンサー...
+    "030320FF": "new_sensor_type",  # 新しいセンサータイプ
+}
+```
+
+### 2. センサークラスの実装
+`MurataSensorBase`を継承した新しいクラスを作成：
+
+```python
+class NewSensorTypeSensor(MurataSensorBase):
+    """新しいセンサータイプのクラス"""
+    
+    def retrieve_values(self):
+        """センサー固有のデータ解析処理"""
+        # ペイロードからデータを抽出
+        raw_value = self.payload[8:12]  # 例：4バイトのデータ
+        
+        # データ変換処理
+        converted_value = self._convert_sensor_data(raw_value)
+        
+        # values辞書に格納
+        self.values = {
+            'sensor_value': converted_value,
+            'voltage': self._get_voltage(),
+            'timestamp': datetime.now().isoformat()
+        }
+    
+    def _convert_sensor_data(self, raw_data: bytes) -> float:
+        """センサー固有のデータ変換処理"""
+        # センサー仕様に応じた変換ロジック
+        pass
+```
+
+### 3. ファクトリーパターンに追加
+[murata_receiver.py](mdc:murata_sensor/murata_receiver.py)の`_create_sensor_instance`メソッドに追加：
+
+```python
+def _create_sensor_instance(self, sensor_type: str, data: bytes, addr) -> Optional[MurataSensorBase]:
+    sensor_classes = {
+        # 既存のセンサー...
+        "new_sensor_type": NewSensorTypeSensor,
+    }
+    
+    sensor_class = sensor_classes.get(sensor_type)
+    if sensor_class:
+        return sensor_class(data, addr)
+    return None
+```
+
+## データフォーマット標準 
+
+### 電文フォーマット 
+村田センサーの電文は以下のフォーマットに従います：
+
+```
+ERXDATA [送信元ID] [宛先ID] [LQI] [パケット] [ペイロード長] [RSSI] [ペイロード] [送信元ID] [チェックサム]
+```
+
+### ペイロード解析パターン 
+
+#### 1. 基本データ抽出
+```python
+def extract_basic_info(self):
+    """基本情報の抽出"""
+    # RSSI値の計算
+    rssi_hex = self.data[23:25].decode()
+    self.info['RSSI'] = int(rssi_hex, 16) - 107
+    
+    # ペイロード長の取得
+    self.payload_length = int(self.data[31:33], 16)
+    
+    # ペイロードの抽出
+    self.payload = self.data[33 + 1:33 + 1 + self.payload_length]
+```
+
+#### 2. センサー値の変換
+```python
+def convert_temperature(self, raw_temp: str) -> float:
+    """温度データの変換（例）"""
+    temp_int = int(raw_temp, 16)
+    # センサー固有の変換式
+    return (temp_int - 2731) / 10.0  # ケルビンから摂氏への変換例
+
+def convert_voltage(self, raw_voltage: str) -> float:
+    """電圧データの変換（例）"""
+    voltage_int = int(raw_voltage, 16)
+    return voltage_int / 1000.0  # mVからVへの変換例
+```
+
+## チェックサム検証 
+
+### 必須のチェックサム検証
+全てのセンサークラスで以下のチェックサムを検証する必要があります：
+
+```python
+def _validate_checksums(self):
+    """チェックサムの検証"""
+    # 電文全体のチェックサム
+    if not self._check_data():
+        raise FailedCheckSum("電文全体のチェックサムが不正です")
+    
+    # ペイロードのチェックサム（必要な場合）
+    if self.payload_length % 8 != 0 and not self._check_payload():
+        raise FailedCheckSumPayload("ペイロードのチェックサムが不正です")
+```
+
+## エラーハンドリング戦略 
+
+### 1. グレースフルな劣化
+センサーデータの解析エラーでシステム全体を停止させない：
+
+```python
+def make_sensor(self, data: bytes, addr) -> Optional[MurataSensorBase]:
+    try:
+        # センサーインスタンス生成
+        sensor = self._create_sensor_instance(sensor_type, data, addr)
+        return sensor
+    except (FailedCheckSum, FailedCheckSumPayload) as e:
+        # チェックサムエラーはログ出力して継続
+        logger.warning(f"データ検証エラー from {addr}: {e}")
+        return None
+    except Exception as e:
+        # その他のエラーもログ出力して継続
+        logger.error(f"センサーデータ処理エラー from {addr}: {e}")
+        return None
+```
+
+### 2. データ品質管理
+```python
+def validate_sensor_data(self, values: dict) -> bool:
+    """センサーデータの妥当性検証"""
+    # 範囲チェック
+    if 'temperature' in values:
+        temp = values['temperature']
+        if not (-40 <= temp <= 85):  # 一般的なセンサー範囲
+            logger.warning(f"温度値が範囲外: {temp}°C")
+            return False
+    
+    # 必須フィールドチェック
+    required_fields = ['voltage']
+    for field in required_fields:
+        if field not in values:
+            logger.warning(f"必須フィールドが不足: {field}")
+            return False
+    
+    return True
+```
+
+## デバッグとテスト 
+
+### 1. デバッグ用データ送信
+[examples/debug_sender.py](mdc:examples/debug_sender.py)を参考にして、テスト用のセンサーデータを送信：
+
+```python
+# 新しいセンサータイプのテストデータ
+test_data = "ERXDATA 1234 0000 5678 F000 2A 7A 030320FF[新しいペイロード] 1234 7FFF\r\n"
+```
+
+### 2. 単体テスト
+[tests/test_murata_sensor.py](mdc:tests/test_murata_sensor.py)に新しいセンサー用のテストを追加：
+
+```python
+def test_new_sensor_type():
+    """新しいセンサータイプのテスト"""
+    test_data = b"ERXDATA..."  # テストデータ
+    sensor = NewSensorTypeSensor(test_data, ('127.0.0.1', 55039))
+    
+    assert sensor.values is not None
+    assert 'sensor_value' in sensor.values
+    assert sensor.info['RSSI'] is not None
+```
+
+## パフォーマンス最適化 
+
+### 1. メモリ効率
+```python
+# 大量のセンサーデータを扱う場合
+class OptimizedSensorData:
+    __slots__ = ['timestamp', 'values', 'rssi']  # メモリ使用量削減
+    
+    def __init__(self, timestamp, values, rssi):
+        self.timestamp = timestamp
+        self.values = values
+        self.rssi = rssi
+```
+
+### 2. データ圧縮
+```python
+import json
+import gzip
+
+def compress_sensor_data(self, data: dict) -> bytes:
+    """センサーデータの圧縮保存"""
+    json_data = json.dumps(data).encode('utf-8')
+    return gzip.compress(json_data)
+```
+
+## 監視とアラート 
+
+### 1. データ品質監視
+```python
+def monitor_data_quality(self, sensor_data):
+    """データ品質の監視"""
+    # 異常値の検出
+    if self._is_outlier(sensor_data.values):
+        logger.alert(f"異常値検出: {sensor_data.values}")
+    
+    # 通信品質の監視
+    if sensor_data.rssi < -90:  # 閾値例
+        logger.warning(f"信号強度低下: RSSI={sensor_data.rssi}dBm")
+```
+
+### 2. システムヘルス監視
+```python
+def check_system_health(self):
+    """システムヘルスチェック"""
+    # センサー接続状況
+    active_sensors = len(self.sensors)
+    if active_sensors == 0:
+        logger.warning("アクティブなセンサーがありません")
+    
+    # メモリ使用量チェック
+    import psutil
+    memory_percent = psutil.virtual_memory().percent
+    if memory_percent > 80:
+        logger.warning(f"メモリ使用率高: {memory_percent}%")
+```

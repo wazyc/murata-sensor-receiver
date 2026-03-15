@@ -1,0 +1,184 @@
+---
+globs: docs/*.md,*.md
+description: ドキュメント作成と保守に関する規約
+---
+
+# ドキュメント作成規約 
+
+## 基本方針 
+このプロジェクトでは日本語ドキュメントを作成します。
+
+## ドキュメント構造 
+
+### 1. ファイル命名規則
+- 設計書: `snake_case.md` (例: `architecture.md`, `api_specification.md`)
+- README: `README.md` (各ディレクトリのインデックス)
+- 言語コード: 必要に応じて `document_name_ja.md`, `document_name_en.md`
+
+### 2. 文書テンプレート
+
+```markdown
+# タイトル（日本語）
+
+## 概要 
+システムの概要説明を日本語記載
+
+## 詳細セクション
+### セクション名 
+内容...
+
+```
+
+## 技術文書の書式 
+
+### 1. コードブロック 
+````markdown
+```python
+# Pythonコードの例
+class MurataSensorBase:
+    """
+    日本語説明
+    """
+    pass
+```
+````
+
+### 2. APIドキュメント形式
+```markdown
+#### get_latest_data(addr: tuple)
+```python
+def get_latest_data(addr: tuple) -> Optional[Dict]
+```
+**説明:**  
+指定した送信元アドレスの最新のセンサーデータを取得します。  
+Retrieves the latest sensor data from the specified source address.
+
+**パラメータ:**
+- `addr` (tuple): IPアドレスとポート番号のタプル / IP address and port number tuple
+
+**戻り値:**
+- `Dict`: センサーデータ辞書 / Sensor data dictionary
+- `None`: データが存在しない場合 / When no data exists
+
+
+### 3. 図表の使用 
+
+#### Mermaid図の使用
+
+```mermaid
+graph TB
+    A[村田センサー<br/>Murata Sensors] -->|UDP packets| B[MurataReceiver]
+    B --> C[データ解析<br/>Data Analysis]
+    C --> D[ストレージ<br/>Storage]
+```
+
+
+#### テーブル形式
+```markdown
+| 項目名 / Item | 説明 / Description | 値 / Value |
+|--------------|-------------------|-----------|
+| ポート / Port | UDP受信ポート / UDP reception port | 55039 |
+| バッファ / Buffer | 受信バッファサイズ / Reception buffer size | 1024 |
+```
+
+## 設計書の管理 
+
+### 1. ドキュメント階層
+- **[docs/overview.md](mdc:docs/overview.md)**: プロジェクト概要・関連ドキュメント一覧
+- **[docs/architecture.md](mdc:docs/architecture.md)**: システム設計書
+- **[docs/api_specification.md](mdc:docs/api_specification.md)**: API仕様書
+
+### 2. 相互参照
+```markdown
+詳細は [architecture.md](./architecture.md) を参照してください。  
+For details, see [architecture.md](./architecture.md).
+
+関連するAPIについては [api_specification.md](./api_specification.md#muratareceiver) を確認してください。
+```
+
+
+## コメント・注釈の書式 
+
+### 2. 制限事項 
+
+```markdown
+## 制限事項
+
+1. **永続化**: メモリ内でのデータ管理のみ
+2. **通信セキュリティ**: 平文UDP通信
+```
+
+## 品質保証
+
+### 1. レビューチェックリスト
+- [ ] コードサンプルが動作するか
+- [ ] 相互参照リンクが正しいか
+- [ ] 更新履歴が記載されているか
+- [ ] 図表が適切に表示されるか
+
+### 2. アクセシビリティ
+```markdown
+# 適切な見出し階層の使用
+## レベル2見出し
+### レベル3見出し
+
+<!-- 意味のあるリンクテキスト -->
+[MurataReceiver API仕様](./api_specification.md#muratareceiver)
+
+<!-- 図表の代替テキスト -->
+![システム構成図：センサーからUDP受信、データ解析、ストレージへの流れ](./images/architecture.png)
+```
+
+### 3. 保守性
+```markdown
+<!-- TODOコメントの使用 -->
+<!-- TODO: データベース実装後にこのセクションを更新 -->
+<!-- FIXME: リンク切れの修正が必要 -->
+<!-- NOTE: このAPIは将来的に変更予定 -->
+```
+
+## 自動化とツール 
+
+### 1. ドキュメント生成
+```python
+# 将来的な自動生成スクリプト例
+def generate_api_docs():
+    """APIドキュメントの自動生成"""
+    # docstringからMarkdownを生成
+    pass
+
+def update_toc():
+    """目次の自動更新"""
+    # README.mdの目次を自動更新
+    pass
+```
+
+### 2. リンクチェック
+```markdown
+<!-- 内部リンクの例 -->
+[プロジェクト構造](./README.md#プロジェクト構造)
+[MurataReceiver](./api_specification.md#muratareceiver)
+
+<!-- 外部リンクの例 -->
+[Python公式ドキュメント](https://docs.python.org/3/)
+[村田製作所](https://www.murata.com/)
+```
+
+## 言語・文体ガイド
+
+### 1. 用語統一
+```markdown
+| 日本語 | English | 備考 / Note |
+|--------|---------|-------------|
+| センサー | Sensor | |
+| 受信機 | Receiver | |
+| 電文 | Message/Packet | |
+| ペイロード | Payload | |
+| チェックサム | Checksum | |
+```
+
+### 2. 文体統一
+- **敬語**: 使用しない（技術文書のため）
+- **句読点**: 。、を使用
+- **英数字**: 半角を使用
+- **括弧**: 日本語は（）、英語は()を使用

@@ -1,0 +1,369 @@
+---
+description: PyPIパッケージングと配布に関するガイドライン
+---
+
+# PyPIパッケージングガイドライン
+
+## パッケージ構造のベストプラクティス
+
+### 1. パッケージの基本構造
+```
+murata-sensor-receiver/
+├── murata_sensor/              # メインライブラリパッケージ
+│   ├── __init__.py            # パッケージ初期化・公開API定義
+│   ├── murata_receiver.py     # メイン機能（UDP受信・コールバック処理）
+│   ├── murata_sensor.py       # センサーデータ解析クラス群
+│   └── murata_exception.py    # カスタム例外定義
+├── examples/                   # 使用例とサンプルコード
+│   ├── basic_usage.py         # 基本的な使用方法
+│   ├── database_integration.py # データベース統合例
+│   ├── mqtt_bridge.py         # MQTTブリッジ例
+│   ├── standalone_example.py  # スタンドアロン実行例
+│   └── debug_sender.py        # デバッグ用テストデータ送信
+├── tests/                      # テストコード
+│   └── test_*.py              # 単体・統合テスト
+├── docs/                       # ドキュメント
+│   ├── README.md              # メインREADME
+│   ├── architecture.md        # アーキテクチャ設計書
+│   ├── api_specification.md   # API仕様書
+│   └── database_design.md     # DB設計書（将来用）
+├── scripts/                    # ビルド・配布スクリプト
+│   └── build_and_upload.py    # 自動ビルド・アップロード
+├── setup.py                    # パッケージ設定（従来型）
+├── pyproject.toml             # パッケージ設定（モダン）
+├── README.md                  # PyPI用README
+├── LICENSE                    # ライセンスファイル
+├── CHANGELOG.md               # 変更履歴
+└── MANIFEST.in               # パッケージ含むファイル指定
+```
+
+### 2. パッケージ初期化のベストプラクティス 
+
+#### __init__.pyの構造 
+```python
+"""
+Murata Sensor Receiver Library
+
+A Python library for receiving and processing data from Murata wireless sensor units.
+村田製作所製無線センサユニットからのデータ受信・処理ライブラリ
+
+Basic Usage:
+    from murata_sensor import MurataReceiver
+
+    def data_handler(sensor_data, addr):
+        print(f"Received data from {addr}: {sensor_data['values']}")
+
+    receiver = MurataReceiver(port=55039, data_callback=data_handler)
+    receiver.recv()
+"""
+
+__version__ = "0.0.1"
+__author__ = "Murata Sensor Team"
+__email__ = "sensor-team@example.com"
+__license__ = "MIT"
+
+# Main classes - 公開APIとしてエクスポート
+from .murata_receiver import MurataReceiver, SensorData
+from .murata_sensor import (
+    MurataSensorBase,
+    # 各センサークラス...
+)
+from .murata_exception import (
+    MurataExceptionBase,
+    FailedCheckSum,
+    FailedCheckSumPayload,
+)
+
+# Public API定義 - 明確な公開インターフェースを定義
+__all__ = [
+    "MurataReceiver", "SensorData",  # メインクラス
+    "MurataSensorBase",  # 基底クラス
+    # その他の公開クラス...
+]
+```
+
+## setup.pyとpyproject.tomlの設定 
+
+### 1. setup.py（従来型設定） 
+```python
+from setuptools import setup, find_packages
+
+setup(
+    name="murata-sensor-receiver",
+    version="0.0.1",
+    author="Murata Sensor Team",
+    author_email="sensor-team@example.com",
+    description="A Python library for receiving and processing data from Murata wireless sensor units",
+    long_description=open("README.md").read(),
+    long_description_content_type="text/markdown",
+    url="https://github.com/murata-sensor/murata-sensor-receiver",
+    packages=find_packages(exclude=["tests", "examples", "docs"]),
+    classifiers=[
+        "Development Status :: 3 - Alpha",
+        "Intended Audience :: Developers",
+        "License :: OSI Approved :: MIT License",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Topic :: Software Development :: Libraries :: Python Modules",
+        "Topic :: System :: Networking",
+        "Topic :: Scientific/Engineering :: Information Analysis",
+    ],
+    python_requires=">=3.8",
+    install_requires=[],  # 依存関係なし（標準ライブラリのみ）
+    extras_require={
+        "dev": [
+            "pytest>=7.0.0",
+            "pytest-cov>=4.0.0",
+            "black>=22.0.0",
+            "flake8>=5.0.0",
+            "mypy>=1.0.0",
+        ],
+    },
+    keywords="murata sensor receiver UDP wireless IoT",
+    include_package_data=True,
+    zip_safe=False,
+)
+```
+
+### 2. pyproject.toml（モダン設定） 
+```toml
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "murata-sensor-receiver"
+version = "0.0.1"
+authors = [
+    {name = "Murata Sensor Team", email = "sensor-team@example.com"},
+]
+description = "A Python library for receiving and processing data from Murata wireless sensor units"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Networking",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
+keywords = ["murata", "sensor", "receiver", "UDP", "wireless", "IoT"]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=22.0.0",
+    "flake8>=5.0.0",
+    "mypy>=1.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/murata-sensor/murata-sensor-receiver"
+Documentation = "https://github.com/murata-sensor/murata-sensor-receiver/blob/main/docs/README.md"
+Repository = "https://github.com/murata-sensor/murata-sensor-receiver.git"
+"Bug Tracker" = "https://github.com/murata-sensor/murata-sensor-receiver/issues"
+
+[tool.setuptools.packages.find]
+exclude = ["tests*", "examples*", "docs*"]
+```
+
+## MANIFEST.inの設定 
+
+### 1. 必要なファイルの指定 
+```
+include README.md
+include LICENSE
+include CHANGELOG.md
+recursive-include docs *.md
+recursive-include examples *.py
+recursive-exclude tests *
+recursive-exclude .cursor *
+exclude .gitignore
+exclude .cursorignore
+prune db
+```
+
+### 2. ファイル包含のルール 
+- **include**: 常に含めるファイル（README, LICENSE等）
+- **recursive-include**: ディレクトリ内の特定パターンファイルを再帰的に含める
+- **recursive-exclude**: 特定のディレクトリやパターンを除外
+- **exclude**: 特定ファイルを除外
+- **prune**: ディレクトリ全体を除外
+
+## ビルド・配布プロセス 
+
+### 1. 開発時ビルド 
+```bash
+# 開発依存関係のインストール
+pip install -e ".[dev]"
+
+# テスト実行
+pytest
+
+# パッケージビルド（開発用）
+python setup.py sdist bdist_wheel
+
+# ビルド結果確認
+ls -la dist/
+# murata_sensor_receiver-0.0.1-py3-none-any.whl
+# murata-sensor-receiver-0.0.1.tar.gz
+```
+
+### 2. PyPIアップロード 
+```bash
+# TestPyPIにアップロード（テスト用）
+python -m twine upload --repository testpypi dist/*
+
+# 本番PyPIにアップロード
+python -m twine upload dist/*
+
+# 自動化スクリプト使用
+python scripts/build_and_upload.py --test  # TestPyPI用
+python scripts/build_and_upload.py         # 本番PyPI用
+```
+
+## バージョン管理 
+
+### 1. セマンティックバージョニング 
+```
+MAJOR.MINOR.PATCH
+
+- MAJOR: 破壊的変更（API変更）
+- MINOR: 後方互換性のある機能追加
+- PATCH: バグ修正
+```
+
+### 2. バージョン更新パターン 
+```python
+# __init__.pyでバージョンを定義
+__version__ = "0.0.1"
+
+# またはsetup.py/pyproject.tomlで管理
+version = "0.0.1"
+```
+
+### 3. 変更履歴管理 
+```markdown
+# CHANGELOG.md形式
+## [Unreleased]
+
+## [0.0.1] - 2024-09-30
+
+### Added
+- 新機能追加リスト
+
+### Changed
+- 変更点リスト
+
+### Fixed
+- バグ修正リスト
+```
+
+## パッケージ品質基準 
+
+### 1. 必須要素 
+- [ ] README.md（詳細な使用説明）
+- [ ] LICENSEファイル（適切なライセンス）
+- [ ] setup.pyまたはpyproject.toml（適切な設定）
+- [ ] 適切なclassifiers（PyPI分類）
+- [ ] 依存関係の明確な記述
+- [ ] バージョン情報の定義
+
+### 2. 推奨要素 
+- [ ] 包括的なドキュメント（docs/ディレクトリ）
+- [ ] 使用例（examples/ディレクトリ）
+- [ ] テストコード（tests/ディレクトリ）
+- [ ] 変更履歴（CHANGELOG.md）
+- [ ] ビルドスクリプト（scripts/ディレクトリ）
+- [ ] CI/CD設定（GitHub Actions等）
+
+### 3. 品質チェックリスト 
+- [ ] パッケージが依存関係なしでインストール可能か
+- [ ] 全テストがパスするか
+- [ ] コードカバレッジが80%以上か
+- [ ] 型チェック（mypy）が通るか
+- [ ] コードフォーマット（black）が適用されているか
+- [ ] リンター（flake8）チェックが通るか
+- [ ] ドキュメントが最新か
+- [ ] 使用例が動作するか
+
+## トラブルシューティング 
+
+### 1. 一般的な問題 
+
+#### パッケージインポートエラー 
+```python
+# 問題: from murata_sensor import MurataReceiver が失敗
+# 解決: パッケージが正しくインストールされているか確認
+pip show murata-sensor-receiver
+python -c "import murata_sensor; print(murata_sensor.__file__)"
+```
+
+#### テスト実行エラー 
+```bash
+# 問題: テストが失敗する
+# 解決: 開発依存関係がインストールされているか確認
+pip install -e ".[dev]"
+pytest --version
+```
+
+#### ビルドエラー 
+```bash
+# 問題: python setup.py sdist bdist_wheel が失敗
+# 解決: 必要なビルドツールがインストールされているか確認
+pip install setuptools wheel twine
+```
+
+### 2. PyPIアップロード時の問題 
+
+#### 認証エラー 
+```bash
+# 解決: APIトークンを正しく設定
+export TWINE_USERNAME=__token__
+export TWINE_PASSWORD=pypi-xxx...xxx  # APIトークン
+```
+
+#### パッケージ形式エラー 
+```bash
+# 解決: wheelとsdistの両方が適切にビルドされているか確認
+twine check dist/*
+```
+
+## メンテナンスガイドライン 
+
+### 1. 定期的な更新事項 
+- [ ] 依存関係のセキュリティ更新確認
+- [ ] Pythonバージョンサポートの確認・更新
+- [ ] ドキュメントの最新化
+- [ ] テストケースの追加・更新
+- [ ] パフォーマンスの確認・最適化
+
+### 2. リリース前チェックリスト 
+- [ ] 全テストがパスするか確認
+- [ ] コードカバレッジレポートを確認
+- [ ] ドキュメントが最新か確認
+- [ ] 使用例が動作するか確認
+- [ ] CHANGELOG.mdを更新
+- [ ] バージョン番号を更新
+- [ ] パッケージをローカルでテストインストール
+- [ ] TestPyPIで動作確認
+
+### 3. リリース後チェックリスト 
+- [ ] PyPIページの確認
+- [ ] インストールテストの実施
+- [ ] ドキュメントの公開確認
+- [ ] ユーザーからのフィードバック対応準備
+- [ ] 次バージョン開発計画の策定
