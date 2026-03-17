@@ -88,14 +88,15 @@ def parse_text_line(line: str) -> Dict[str, Any]:
     Returns:
         解析結果の辞書:
         {
-            'timestamp': datetime または None,  # 受信タイムスタンプ
-            'source_ip': str または None,        # 送信元IPアドレス
-            'source_port': int または None,      # 送信元ポート番号
-            'sensor': MurataSensorBase,          # 解析済みセンサーオブジェクト
-            'sensor_type': str,                  # センサータイプ名
-            'values': dict,                      # センサー値
-            'info': dict,                        # センサー情報
-            'raw_data': bytes,                   # ERXDATAバイト列
+            'timestamp': datetime または None,      # 受信タイムスタンプ
+            'source_ip': str または None,          # 送信元IPアドレス
+            'source_port': int または None,        # 送信元ポート番号
+            'sensor': MurataSensorBase,            # 解析済みセンサーオブジェクト
+            'sensor_type': str,                    # センサータイプ名
+            'sensor_type_code': str または None,   # センサ種別コード [tt]（16進2桁）
+            'values': dict,                        # センサー値
+            'info': dict,                          # センサー情報
+            'raw_data': bytes,                     # ERXDATAバイト列
         }
 
     Raises:
@@ -176,6 +177,7 @@ def parse_text_line(line: str) -> Dict[str, Any]:
         "source_port": source_port,
         "sensor": sensor,
         "sensor_type": sensor_type,
+        "sensor_type_code": sensor.info.get("sensor_type_code"),
         "values": sensor.values,
         "info": sensor.info,
         "raw_data": raw_data,
@@ -322,6 +324,7 @@ class MurataReceiver:
         # センサーデータをディクショナリ形式に変換
         sensor_data = {
             "sensor_type": sensor.check_sensor_type(sensor.data),
+            "sensor_type_code": sensor.info.get("sensor_type_code"),
             "timestamp": datetime.now().isoformat(),
             "values": sensor.values,
             "info": sensor.info,

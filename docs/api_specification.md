@@ -142,7 +142,7 @@ AsyncMurataReceiver(port: int, buffer_size: int = 1024, logger: Optional[logging
 
 #### イテレーション
 
-`start()` 呼び出し後に `async for sensor_data, addr in receiver:` で受信データをイテレートできる。`sensor_data` は辞書（`sensor_type`, `timestamp`, `values`, `info`, `addr`）。
+`start()` 呼び出し後に `async for sensor_data, addr in receiver:` で受信データをイテレートできる。`sensor_data` は辞書（`sensor_type`, `sensor_type_code`, `timestamp`, `values`, `info`, `addr`）。
 
 ---
 
@@ -169,14 +169,15 @@ def parse_text_line(line: str) -> Dict[str, Any]
 **戻り値:**
 ```python
 {
-    'timestamp': datetime,    # 受信タイムスタンプ（なければNone）
-    'source_ip': str,         # 送信元IPアドレス（なければNone）
-    'source_port': int,       # 送信元ポート番号（なければNone）
-    'sensor': MurataSensorBase,  # 解析済みセンサーオブジェクト
-    'sensor_type': str,       # センサータイプ名
-    'values': dict,           # センサー値
-    'info': dict,             # センサー情報
-    'raw_data': bytes,        # ERXDATAバイト列
+    'timestamp': datetime,          # 受信タイムスタンプ（なければNone）
+    'source_ip': str,               # 送信元IPアドレス（なければNone）
+    'source_port': int,             # 送信元ポート番号（なければNone）
+    'sensor': MurataSensorBase,     # 解析済みセンサーオブジェクト
+    'sensor_type': str,             # センサータイプ名
+    'sensor_type_code': str | None, # センサ種別コード [tt]（16進2桁）
+    'values': dict,                 # センサー値
+    'info': dict,                   # センサー情報
+    'raw_data': bytes,              # ERXDATAバイト列
 }
 ```
 
@@ -402,12 +403,13 @@ class FailedCheckSumPayload(MurataExceptionBase)
 
 ```python
 {
-    "addr": ("192.168.1.100", 55039),  # 送信元アドレス
-    "RSSI": -45,                       # 受信信号強度
-    "route": "...",                    # 経路情報
+    "addr": ("192.168.1.100", 55039),   # 送信元アドレス
+    "RSSI": -45,                        # 受信信号強度
+    "route": "...",                     # 経路情報
     "timestamp": "2024-06-13T10:30:00", # タイムスタンプ
-    "sensor_type": "vibration",        # センサータイプ
-    "values": {                        # センサー値（センサータイプ毎に異なる）
+    "sensor_type": "vibration",         # センサータイプ
+    "sensor_type_code": "09",           # センサ種別コード [tt]（16進2桁, 仕様書「センサ種別」の値）
+    "values": {                         # センサー値（センサータイプ毎に異なる）
         "temperature": 25.3,
         "humidity": 60.2,
         "voltage": 3.2

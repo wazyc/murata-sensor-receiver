@@ -6,7 +6,7 @@ from murata_sensor.murata_exception import *
 # 村田製作所　無線センサユニット　パケットフォーマット
 # ドキュメントバージョン B に対応
 
-# payloadの"センサデータ通知"項目に対応
+# payloadの"センサデータ通知"項目に対応（0303[tt][SS] の 8 文字コード → センサータイプ名）
 SENSOR_TYPE = {
     "030301FF": "temperature_and_humidity",  # 温湿度 1AN
     "030307FF": "thermocouple",  # 3温度/熱電対 1EM/1PF
@@ -207,6 +207,17 @@ class MurataSensorBase(object):
         """電文のペイロード外の情報を取得"""
         self.info["unit_id"] = self.data[8:12].decode("utf-8")
         self.info["message_id"] = self.data[18:22].decode("utf-8")
+
+        # センサ種別コード [tt] をペイロード先頭から取得
+        # 形式: 0303[tt][SS]...
+        # payload[0:4] == b"0303" を前提とし、その直後の 2 文字をセンサ種別コードとして扱う
+        try:
+            type_code_bytes = self.payload[4:6]
+            type_code = type_code_bytes.decode()
+            self.info["sensor_type_code"] = type_code
+        except Exception as e:
+            # 予期しないフォーマットの場合はログのみ出力し、センサ種別コードは設定しない
+            self.logger.error(f"Failed to parse sensor_type_code: {str(e)}")
 
         # センサー状態の解析を追加
         sensor_status = self.payload[6:8].decode()

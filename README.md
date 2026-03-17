@@ -53,6 +53,7 @@ def data_handler(sensor_data, addr):
     """受信したセンサーデータのコールバック関数"""
     print(f"Received from {addr[0]}:{addr[1]}")
     print(f"Sensor Type: {sensor_data['sensor_type']}")
+    print(f"Sensor Type Code: {sensor_data['sensor_type_code']}")  # 例: '01', '09'
     print(f"Values: {sensor_data['values']}")
     print(f"RSSI: {sensor_data['info']['RSSI']} dBm")
     print("-" * 40)
@@ -164,7 +165,7 @@ async def main():
 
     try:
         async for sensor_data, addr in receiver:
-            print(f"{sensor_data['sensor_type']}: {sensor_data['values']}")
+            print(f"{sensor_data['sensor_type']} ({sensor_data['sensor_type_code']}): {sensor_data['values']}")
     finally:
         await receiver.stop()
 
@@ -200,6 +201,113 @@ thread = receiver.run_in_thread()
 | 03031CFF | 3_voltage | 3電圧センサー |
 | 03031DFF | 3_contacts | 3接点センサー |
 | 0303FEFF | waterproof_repeater | 防水中継機 |
+
+## 解析結果のデータ構造
+
+このライブラリは、UDP受信時およびテキスト解析時に、**Pythonの辞書形式**で解析結果を返します。  
+開発者はこの辞書をそのままDB保存・JSON変換・メッセージキュー送信などに利用できます。
+
+### UDP受信（MurataReceiver / AsyncMurataReceiver）の例
+
+`MurataReceiver` の `data_callback` に渡される `sensor_data` の典型的な例（温湿度センサー）:
+
+```python
+{
+    "sensor_type": "temperature_and_humidity",  # センサータイプ名
+    "sensor_type_code": "01",                   # センサ種別コード [tt]（16進2桁）
+    "timestamp": "2024-03-17T10:30:00.123456",  # 受信時刻（ISO8601文字列）
+    "values": {                                 # センサー固有の測定値
+        "power-supply-voltage": {
+            "value": 3.0,
+            "unit": "V",
+            "unit_name": "電位差（電圧）",
+        },
+        "temperature": {
+            "value": 25.3,
+            "unit": "℃",
+            "unit_name": "セルシウス温度",
+        },
+        "humidity": {
+            "value": 60.2,
+            "unit": "%RH",
+            "unit_name": "相対湿度",
+        },
+    },
+    "info": {                                   # センサー情報メタデータ
+        "addr": ("192.168.1.100", 55039),       # 送信元アドレス
+        "unit_id": "0002",                      # ユニットID
+        "message_id": "62BE",                   # メッセージID
+        "RSSI": -45,                            # 受信信号強度[dBm]
+        "sensor_type_code": "01",               # センサ種別コード（冗長だが info 側にも格納）
+        "status": {
+            "code": "FF",
+            "description": "固定値(FF)",
+        },
+        "route": ["7FFF"],                      # 経路情報（最後の要素がゲートウェイID）
+    },
+    "addr": ("192.168.1.100", 55039),           # MurataReceiver が受信したアドレス
+}
+```
+
+振動センサー（1LZ）の例:
+
+```python
+{
+    "sensor_type": "vibration",
+    "sensor_type_code": "09",
+    "timestamp": "2024-03-17T10:31:00.456789",
+    "values": {
+        "power-supply-voltage": {"value": 3.34, "unit": "V", "unit_name": "電位差（電圧）"},
+        "acceleration-RMS": {"value": 1.53, "unit": "m/s2", "unit_name": "加速度実効値"},
+        "kurtosis": {"value": 2.57, "unit": "-", "unit_name": "尖度"},
+        "temperature": {"value": 18.05, "unit": "℃", "unit_name": "セルシウス温度"},
+    },
+    "info": {
+        "addr": ("192.168.1.101", 55039),
+        "unit_id": "1115",
+        "message_id": "0464",
+        "RSSI": -58,
+        "sensor_type_code": "09",
+        "status": {"code": "00", "description": "正常"},
+        "route": ["7FFF"],
+    },
+    "addr": ("192.168.1.101", 55039),
+}
+```
+
+### テキスト解析（parse_text_line）の例
+
+`parse_text_line()` はテキスト1行から同様の情報を辞書で返します:
+
+```python
+from murata_sensor import parse_text_line
+
+line = "2024/09/20 16:26:11 192.168.1.100/55061:ERXDATA 1115 0000 0464 F000 4D 7A 03030900..."
+result = parse_text_line(line)
+
+print(result["sensor_type"])       # 例: 'vibration'
+print(result["sensor_type_code"])  # 例: '09'
+print(result["timestamp"])         # datetime(2024, 9, 20, 16, 26, 11)
+print(result["source_ip"])         # '192.168.1.100'
+print(result["values"])            # センサー固有の値辞書
+print(result["info"])              # MurataSensorBase.info と同等の情報
+```
+
+戻り値の構造（概要）:
+
+```python
+{
+    "timestamp": datetime | None,       # 受信タイムスタンプ（なければ None）
+    "source_ip": str | None,            # 送信元IPアドレス
+    "source_port": int | None,          # 送信元ポート番号
+    "sensor": MurataSensorBase,         # 解析済みセンサーオブジェクト
+    "sensor_type": str,                 # センサータイプ名
+    "sensor_type_code": str | None,     # センサ種別コード [tt]（16進2桁）
+    "values": dict,                     # センサー値
+    "info": dict,                       # センサー情報
+    "raw_data": bytes,                  # 元のERXDATA文字列のバイト列
+}
+```
 
 ## APIリファレンス
 

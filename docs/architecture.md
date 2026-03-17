@@ -22,23 +22,24 @@
 
 ```mermaid
 graph TB
-    A[村田センサー] -->|UDP packets| B[MurataReceiver<br/>UDP受信]
-    B --> C[MurataSensorBase<br/>データ解析基底クラス]
-    C --> D[各センサークラス]
-    D --> E[データストレージ]
-    D --> F[ログ出力]
+    sensorNode[村田センサー] -->|"UDP packets"| murataReceiver[MurataReceiver<br/>UDP受信]
+    murataReceiver --> sensorBase[MurataSensorBase<br/>データ解析基底クラス]
+    sensorBase --> sensorClasses[各センサークラス]
+    sensorBase --> sensorMeta["センサー情報(info)<br/>unit_id / message_id / RSSI / sensor_type_code / status / route"]
+    sensorClasses --> dataStore[データストレージ]
+    sensorClasses --> loggingNode[ログ出力]
     
-    subgraph "センサークラス群"
-        G[VibrationSensor]
-        H[TemperatureAndHumiditySensor]
-        I[CurrentPulseSensor]
-        J[その他...]
+    subgraph sensorClassGroup["センサークラス群"]
+        clsVib[VibrationSensor]
+        clsTemp[TemperatureAndHumiditySensor]
+        clsCurr[CurrentPulseSensor]
+        clsOthers[その他...]
     end
     
-    D --> G
-    D --> H
-    D --> I
-    D --> J
+    sensorClasses --> clsVib
+    sensorClasses --> clsTemp
+    sensorClasses --> clsCurr
+    sensorClasses --> clsOthers
 ```
 
 ## モジュール構成
@@ -57,6 +58,7 @@ graph TB
   - 各センサー固有のデータ解析クラス
   - チェックサム検証
   - RSSI値計算
+  - センサ種別コード（sensor_type_code）の抽出と `info` への格納
 
 ### 3. 例外処理モジュール
 - **murata_exception.py**: カスタム例外定義

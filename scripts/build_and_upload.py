@@ -11,6 +11,7 @@ Usage:
 
 import os
 import sys
+import shutil
 import subprocess
 import argparse
 from pathlib import Path
@@ -34,13 +35,28 @@ def clean_build_artifacts():
     """Clean previous build artifacts"""
     print("🧹 Cleaning build artifacts...")
     
-    # Remove build directories
-    for path in ['build', 'dist', '*.egg-info']:
-        if os.path.exists(path):
-            if os.path.isdir(path):
-                run_command(f"rmdir /s /q {path}", f"Remove {path} directory")
-            else:
-                run_command(f"del {path}", f"Remove {path}")
+    # Remove build directories / files in a cross-platform safe way
+    patterns = ['build', 'dist', '*.egg-info']
+    for pattern in patterns:
+        for path in Path('.').glob(pattern):
+            if path.is_dir():
+                print(f"🔄 Remove {path} directory...")
+                try:
+                    shutil.rmtree(path)
+                    print(f"✅ Success: Remove {path} directory")
+                except Exception as e:
+                    print(f"❌ Failed: Remove {path} directory")
+                    print(f"Error: {e}")
+                    sys.exit(1)
+            elif path.is_file():
+                print(f"🔄 Remove {path} file...")
+                try:
+                    path.unlink()
+                    print(f"✅ Success: Remove {path} file")
+                except Exception as e:
+                    print(f"❌ Failed: Remove {path} file")
+                    print(f"Error: {e}")
+                    sys.exit(1)
 
 def run_tests():
     """Run tests before building"""

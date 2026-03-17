@@ -60,13 +60,95 @@ murataSensorRcvSrv/
 
 以下のファイルでバージョン番号が一致していることを確認：
 
-- `murata_sensor/__init__.py` の `__version__`
+- `src/murata_sensor/__init__.py` の `__version__`
 - `pyproject.toml` の `version`
-- `setup.py` の `version`
+- `setup.py` の `version`（存在する場合）
 
 ```bash
 # バージョン確認コマンド
 python -c "import murata_sensor; print(murata_sensor.__version__)"
+```
+
+---
+
+## バージョンアップ時の編集ファイル一覧
+
+新しいバージョンをリリースする際は、以下のファイルを必ず更新してください。
+
+### 必須編集ファイル
+
+| ファイル | 編集内容 | 例 |
+|---------|---------|-----|
+| `CHANGELOG.md` | 変更内容を記載 | `## [0.1.0] - 2026-03-17` セクションを追加 |
+| `src/murata_sensor/__init__.py` | `__version__` を更新 | `__version__ = "0.1.0"` |
+| `pyproject.toml` | `version` を更新 | `version = "0.1.0"` |
+
+### オプション編集ファイル
+
+| ファイル | 編集タイミング | 内容 |
+|---------|--------------|------|
+| `setup.py` | 使用している場合 | `version` を更新 |
+| `README.md` | 大きな機能追加時 | 使用例やAPIリファレンスを更新 |
+| `docs/api_specification.md` | API変更時 | 新しいAPI仕様を記載 |
+
+### バージョンアップ手順
+
+1. **変更内容の確認**
+   ```bash
+   git status
+   git diff
+   ```
+
+2. **CHANGELOG.md の更新**
+   - `[Unreleased]` セクションの内容を新バージョンに移動
+   - セマンティックバージョニングに従ってバージョン番号を決定
+     - `MAJOR.MINOR.PATCH`
+     - MAJOR: 破壊的変更（API変更）
+     - MINOR: 後方互換性のある機能追加
+     - PATCH: バグ修正
+
+3. **バージョン番号の更新**
+   ```bash
+   # 一括確認（更新前）
+   grep -r "0.0.1" src/murata_sensor/__init__.py pyproject.toml setup.py 2>/dev/null
+   
+   # 各ファイルを編集
+   # - src/murata_sensor/__init__.py
+   # - pyproject.toml
+   # - setup.py（存在する場合）
+   
+   # 一括確認（更新後）
+   grep -r "0.1.0" src/murata_sensor/__init__.py pyproject.toml setup.py 2>/dev/null
+   ```
+
+4. **バージョン確認**
+   ```bash
+   python -c "import sys; sys.path.insert(0, 'src'); import murata_sensor; print(murata_sensor.__version__)"
+   ```
+
+5. **変更をコミット**
+   ```bash
+   git add CHANGELOG.md src/murata_sensor/__init__.py pyproject.toml
+   git commit -m "Bump version to 0.1.0"
+   git tag v0.1.0
+   ```
+
+6. **ビルドとアップロード**（後述の手順に従う）
+
+### セマンティックバージョニングの例
+
+```markdown
+## バージョン 0.0.1 → 0.1.0（MINOR更新）
+- 新機能追加: センサ種別コード（sensor_type_code）の追加
+- 後方互換性あり
+
+## バージョン 0.1.0 → 0.1.1（PATCH更新）
+- バグ修正: チェックサムエラーの修正
+- 後方互換性あり
+
+## バージョン 0.1.1 → 1.0.0（MAJOR更新）
+- 破壊的変更: API構造の大幅変更
+- 後方互換性なし
 ```
 
 ---

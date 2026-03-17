@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "murata-sensor-receiver"
-version = "0.0.1"
+version = "0.1.0"
 authors = [
     {name = "Wazyc", email = "wazyc@example.com"},
 ]
@@ -45,7 +45,7 @@ dev = [
 
 [project.urls]
 Homepage = "https://github.com/wazyc/murata-sensor-receiver"
-Documentation = "https://github.com/wazyc/murata-sensor-receiver/blob/main/docs/README.md"
+Documentation = "https://github.com/wazyc/murata-sensor-receiver"
 Repository = "https://github.com/wazyc/murata-sensor-receiver.git"
 "Bug Tracker" = "https://github.com/wazyc/murata-sensor-receiver/issues"
 
