@@ -59,6 +59,7 @@ graph TB
   - チェックサム検証
   - RSSI値計算
   - センサ種別コード（sensor_type_code）の抽出と `info` への格納
+  - 無効値（`FFFFFF##`）の検出とNone変換
 
 ### 3. 例外処理モジュール
 - **murata_exception.py**: カスタム例外定義
@@ -90,11 +91,31 @@ graph TB
 3. **センサーインスタンス生成**
    - センサータイプに応じた専用クラスのインスタンス化
    - センサー固有のデータ解析処理
+   - 無効値（`FFFFFF##`）の検出とNone変換
 
 4. **データ格納・管理**
    - 送信元IPアドレス別にデータ管理
    - 履歴データ保持
    - 最新データへのアクセス提供
+
+### 無効値の処理フロー
+
+```mermaid
+graph LR
+    payload[ペイロードデータ] --> getValue["_get_value()"]
+    getValue --> checkInvalid{無効値判定}
+    checkInvalid -->|"FFFF## or ##FF##"| returnNone["value: None"]
+    checkInvalid -->|有効値| calculate["値を計算"]
+    calculate --> returnValue["value: 計算結果"]
+    returnNone --> output[出力辞書]
+    returnValue --> output
+```
+
+**無効値判定条件:**
+- データ部分が`FFFF`（16進4桁）
+- スケール部分が`FF`（16進2桁）
+
+上記のいずれかに該当する場合、`value`に`None`を設定し、`unit`と`unit_name`は正常に設定されます。
 
 ## 設計パターン
 

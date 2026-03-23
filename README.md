@@ -249,7 +249,7 @@ thread = receiver.run_in_thread()
 }
 ```
 
-振動センサー（1LZ）の例:
+振動センサー（1LZ）の例（FFT有効時）:
 
 ```python
 {
@@ -258,9 +258,14 @@ thread = receiver.run_in_thread()
     "timestamp": "2024-03-17T10:31:00.456789",
     "values": {
         "power-supply-voltage": {"value": 3.34, "unit": "V", "unit_name": "電位差（電圧）"},
-        "acceleration-RMS": {"value": 1.53, "unit": "m/s2", "unit_name": "加速度実効値"},
-        "kurtosis": {"value": 2.57, "unit": "-", "unit_name": "尖度"},
-        "temperature": {"value": 18.05, "unit": "℃", "unit_name": "セルシウス温度"},
+        "peak-frequency-1": {"value": 12, "unit": "Hz", "unit_name": "周波数"},
+        "peak-acceleration-1": {"value": 0.22, "unit": "m/s2", "unit_name": "加速度"},
+        "peak-frequency-2": {"value": 25, "unit": "Hz", "unit_name": "周波数"},
+        "peak-acceleration-2": {"value": 0.22, "unit": "m/s2", "unit_name": "加速度"},
+        # ... (ピーク3-5も同様)
+        "acceleration-RMS": {"value": 0.12, "unit": "m/s2", "unit_name": "加速度実効値"},
+        "kurtosis": {"value": 1.53, "unit": "-", "unit_name": "尖度"},
+        "temperature": {"value": 26.52, "unit": "℃", "unit_name": "セルシウス温度"},
     },
     "info": {
         "addr": ("192.168.1.101", 55039),
@@ -272,6 +277,26 @@ thread = receiver.run_in_thread()
         "route": ["7FFF"],
     },
     "addr": ("192.168.1.101", 55039),
+}
+```
+
+**無効値の処理:**
+
+センサーデータに無効値（ペイロード内で`FFFFFF##`）が含まれる場合、`value`フィールドに`None`が設定されます。
+
+```python
+# FFT無効時の振動センサー例（ピーク値が無効）
+{
+    "sensor_type": "vibration",
+    "values": {
+        "power-supply-voltage": {"value": 3.03, "unit": "V", "unit_name": "電位差（電圧）"},
+        "peak-frequency-1": {"value": None, "unit": "Hz", "unit_name": "周波数"},  # 無効
+        "peak-acceleration-1": {"value": None, "unit": "m/s2", "unit_name": "加速度"},  # 無効
+        # ... (ピーク2-5も無効)
+        "acceleration-RMS": {"value": 0.0, "unit": "m/s2", "unit_name": "加速度実効値"},
+        "kurtosis": {"value": 0.0, "unit": "-", "unit_name": "尖度"},
+        "temperature": {"value": 25, "unit": "℃", "unit_name": "セルシウス温度"}
+    }
 }
 ```
 

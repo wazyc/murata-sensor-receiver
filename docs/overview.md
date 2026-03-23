@@ -24,6 +24,7 @@
 4. 非同期（asyncio）対応: `AsyncMurataReceiver`、スレッド実行: `MurataReceiver.run_in_thread()`
 5. テキスト化された受信データからの解析: `parse_text_line()`（サンプル: `examples/parse_text.py`）
 6. 自動チェックサム検証
+7. 無効値の自動検出とNone変換（FFT無効時のピーク値、熱電対の基準温度など）
 
 ## 使用方法
 
@@ -80,6 +81,18 @@ asyncio.run(main())
 
 電文仕様書は `docs/confidential/murata_message_specifications.md`（git ignore 対象の場合はリポジトリに含まれない）。
 
+## 変更履歴
+
+### v0.2.0 (予定)
+- **振動センサー1LZ**: FFT解析結果（ピーク周波数・加速度1-5）の出力に対応
+- **無効値処理**: ペイロード内の無効値（`FFFFFF##`）を`None`として明示的に返すように改善
+- **全センサー対応**: 小型熱電対2FWなど、すべてのセンサーで無効値が統一的に処理される
+
+### v0.1.0 (現行)
+- 初回リリース
+- 20種類以上のセンサータイプに対応
+- UDP受信、テキスト解析、非同期受信の機能を実装
+
 ## ディレクトリ構造
 
 ```
@@ -105,7 +118,9 @@ murata-sensor-receiver/
 │   ├── callback_class.py      # コールバック: クラス
 │   ├── callback_partial.py    # コールバック: partial
 │   ├── callback_lambda.py     # コールバック: ラムダ
-│   └── debug_sender.py        # テスト用送信
+│   ├── debug_sender.py        # テスト用送信
+│   ├── test_fft_modes.py      # FFT有効/無効時のテスト
+│   └── test_invalid_values.py # 無効値処理のテスト
 ├── tests/                      # テストコード
 ├── docs/                       # ドキュメント（本ファイルは docs/overview.md）
 ├── pyproject.toml              # パッケージ設定

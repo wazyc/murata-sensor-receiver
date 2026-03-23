@@ -270,11 +270,29 @@ class MurataSensorBase(object):
                 'unit': 'V',
                 'unit_name': '電位差（電圧）'
             }
+            無効値の場合（FFFF## または ##FF##）:
+            {
+                'value': None,
+                'unit': 'V',
+                'unit_name': '電位差（電圧）'
+            }
         """
         scale = val_hex_text[4:6]
         unit = val_hex_text[6:8]
+        
+        # 無効値判定: データ部分がFFFFまたはスケールがFF
+        data_hex = val_hex_text[0:4].decode()
+        scale_str = scale.decode()
+        
+        if data_hex == "FFFF" or scale_str == "FF":
+            return {
+                "value": None,
+                "unit": UNIT_TYPE[unit.decode()]["unit"],
+                "unit_name": UNIT_TYPE[unit.decode()]["name"],
+            }
+        
         return {
-            "value": round(int(val_hex_text[0:4], 16) * SCALE[scale.decode()], 10),
+            "value": round(int(data_hex, 16) * SCALE[scale_str], 10),
             "unit": UNIT_TYPE[unit.decode()]["unit"],
             "unit_name": UNIT_TYPE[unit.decode()]["name"],
         }
@@ -342,7 +360,11 @@ class MurataSensorBase(object):
 
 
 class VibrationSensor(MurataSensorBase):
-    """振動ユニット"""
+    """振動ユニット（加速度版 1LZ）
+    
+    FFT有効時: ピーク周波数・加速度1-5を含む全14項目を出力
+    FFT無効時: ピーク値は無効（value=None）として出力
+    """
 
     def __init__(
         self,
@@ -354,6 +376,26 @@ class VibrationSensor(MurataSensorBase):
     def retrieve_values(self) -> None:
         # 電源電圧：[V]
         self.values["power-supply-voltage"] = self._get_value(self.payload[8:16])
+        # センサデータ（ピーク周波数1）：[Hz]
+        self.values["peak-frequency-1"] = self._get_value(self.payload[16:24])
+        # センサデータ（ピーク加速度1）：[m/s2]
+        self.values["peak-acceleration-1"] = self._get_value(self.payload[24:32])
+        # センサデータ（ピーク周波数2）：[Hz]
+        self.values["peak-frequency-2"] = self._get_value(self.payload[32:40])
+        # センサデータ（ピーク加速度2）：[m/s2]
+        self.values["peak-acceleration-2"] = self._get_value(self.payload[40:48])
+        # センサデータ（ピーク周波数3）：[Hz]
+        self.values["peak-frequency-3"] = self._get_value(self.payload[48:56])
+        # センサデータ（ピーク加速度3）：[m/s2]
+        self.values["peak-acceleration-3"] = self._get_value(self.payload[56:64])
+        # センサデータ（ピーク周波数4）：[Hz]
+        self.values["peak-frequency-4"] = self._get_value(self.payload[64:72])
+        # センサデータ（ピーク加速度4）：[m/s2]
+        self.values["peak-acceleration-4"] = self._get_value(self.payload[72:80])
+        # センサデータ（ピーク周波数5）：[Hz]
+        self.values["peak-frequency-5"] = self._get_value(self.payload[80:88])
+        # センサデータ（ピーク加速度5）：[m/s2]
+        self.values["peak-acceleration-5"] = self._get_value(self.payload[88:96])
         # センサデータ（加速度RMS） ：[m/s2]
         self.values["acceleration-RMS"] = self._get_value(self.payload[96:104])
         # センサデータ（尖度）

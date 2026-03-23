@@ -59,27 +59,38 @@ class udpsend():
         self.udpClntSock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # ソケット作成
         self.udpClntSock.bind(self.SrcAddr)  # 送信元アドレスでバインド
 
-    def send(self):
-        # data = "ERXDATA 0002 0000 62BE F000 18 20 030301FF012605320C90052A11AF052C7C0002 7FFF"
-        # data = "ERXDATA 0003 0000 3253 F000 49 82 03031800015A0532000500260001040C00D801260009050C000204630001012600250572001301260003057200CD002600030572001B0574011A05660B51052A0C75 0003 7FF"
-        # data = "ERXDATA 8001 0000 1012 F000 2A 7A 03030900012F0532FFFFFF26FFFFFF0CFFFFFF26FFFFFF0CFFFFFF26FFFFFF0CFFFFFF26FFFFFF0CFFFFFF26FFFFFF0C00000063000000660019002A7170 8001 7FFF"
-        # data = "ERXDATA 0002 0000 62BE F000 18 20 030301FF012605320C90052A11AF052C7C"
+    def send(self, mode="fft_enabled"):
+        """テストデータを送信
+        
+        Args:
+            mode: 送信モード
+                - "fft_enabled": FFT有効時のデータ（ピーク値有効）
+                - "fft_disabled": FFT無効時のデータ（ピーク値無効）
+                - "real": 実際のセンサーデータ
+        """
+        if mode == "fft_enabled":
+            # FFT有効時の例（仕様書より）
+            # ピーク周波数1-5、ピーク加速度1-5が有効
+            data = "ERXDATA 0003 0000 25B3 F000 1A 7A 0303090001290532000C00260002050C002500260001050C000501260001050C003E00260001050C00AF00260001050C00010563014305660019002A0F03 0003 7FFF"
+        elif mode == "fft_disabled":
+            # FFT無効時の例（ピーク周波数・加速度がすべてFFFFFF##）
+            # 加速度RMS=0.0、尖度=0.0、温度=25℃
+            data = "ERXDATA 8001 0000 1012 F000 2A 7A 03030900012F0532FFFFFF26FFFFFF0CFFFFFF26FFFFFF0CFFFFFF26FFFFFF0CFFFFFF26FFFFFF0CFFFFFF26FFFFFF0C00000063000000660019002A7170 8001 7FFF"
+        elif mode == "real":
+            # 実際のセンサーから取れたデータ（FFT有効）
+            data = "ERXDATA 1115 0000 0464 F000 4D 7A 03030900014E0532000C00260016050C001900260016050C002500260016050C004B00260007050C005700260007050C000C0563009905660A5C052A070D 1115 7FFF"
+        else:
+            raise ValueError(f"Unknown mode: {mode}")
 
-        # 実際のセンサーから取れたデータ
-        # data = "ERXDATA B07C 0000 3D3C F000 4D 3A 030310FF013A05320157000700000362000000070000036200000007727D B07C 7FFF\r\n" # current_pulse
-        data = "ERXDATA 1115 0000 0464 F000 4D 7A 03030900014E0532000C00260016050C001900260016050C002500260016050C004B00260007050C005700260007050C000C0563009905660A5C052A070D 1115 7FFF\r\n" # vibration
+        data = data.encode('utf-8')
+        self.udpClntSock.sendto(data, self.DstAddr)
 
 
-
-        # チェックサムに失敗する電文
-        # data = "ERXDATA 8001 0000 1012 F000 2A 7A 03030900012F0532FFFFFF26FFFFFF0CFFFFFF26FFFFFF0CFFFFFF26FFFFFF0CFFFFFF26FFFFFF0CFFFFFF26FFFFFF0C00000063000000660019002A7199 8001 7FFF"
-        # data = "ERXDATA 0002 0000 62BE F000 18 20 030301FF012605320C90052A11AF052C7C"
-        data = data.encode('utf-8')  # バイナリに変換
-
-        # data = "ERXDATA 0002 0000 62BE F000 18 20 030301FF012605320C90052A11AF052C7C"
-
-        self.udpClntSock.sendto(data, self.DstAddr)  # 宛先アドレスに送信
-
-
-udp = udpsend()  
-udp.send()  
+if __name__ == "__main__":
+    import sys
+    udp = udpsend()
+    
+    # コマンドライン引数でモードを指定可能
+    mode = sys.argv[1] if len(sys.argv) > 1 else "fft_enabled"
+    print(f"Sending test data: mode={mode}")
+    udp.send(mode=mode)  

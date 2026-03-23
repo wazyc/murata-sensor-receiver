@@ -285,16 +285,52 @@ def retrieve_values(self) -> None
 
 ### 4. 各センサークラス
 
-#### VibrationSensor（振動センサー）
+#### VibrationSensor（振動センサー・加速度版 1LZ）
 
 ```python
 class VibrationSensor(MurataSensorBase)
 ```
 
 **解析対象データ:**
-- 振動データ
-- 電源電圧
-- RSSI値
+- 電源電圧 [V]
+- ピーク周波数1-5 [Hz]（FFT有効時のみ、無効時はNone）
+- ピーク加速度1-5 [m/s2]（FFT有効時のみ、無効時はNone）
+- 加速度RMS [m/s2]
+- 尖度 [-]
+- 温度 [℃]
+- RSSI値 [dBm]
+
+**出力形式（FFT有効時）:**
+```python
+{
+    'power-supply-voltage': {'value': 2.97, 'unit': 'V', 'unit_name': '電位差（電圧）'},
+    'peak-frequency-1': {'value': 12, 'unit': 'Hz', 'unit_name': '周波数'},
+    'peak-acceleration-1': {'value': 0.02, 'unit': 'm/s2', 'unit_name': '加速度'},
+    'peak-frequency-2': {'value': 37, 'unit': 'Hz', 'unit_name': '周波数'},
+    'peak-acceleration-2': {'value': 0.01, 'unit': 'm/s2', 'unit_name': '加速度'},
+    # ... (ピーク3-5も同様)
+    'acceleration-RMS': {'value': 0.01, 'unit': 'm/s2', 'unit_name': '加速度実効値'},
+    'kurtosis': {'value': 3.23, 'unit': '-', 'unit_name': '尖度'},
+    'temperature': {'value': 25, 'unit': '℃', 'unit_name': 'セルシウス温度'}
+}
+```
+
+**出力形式（FFT無効時）:**
+```python
+{
+    'power-supply-voltage': {'value': 3.03, 'unit': 'V', 'unit_name': '電位差（電圧）'},
+    'peak-frequency-1': {'value': None, 'unit': 'Hz', 'unit_name': '周波数'},  # 無効
+    'peak-acceleration-1': {'value': None, 'unit': 'm/s2', 'unit_name': '加速度'},  # 無効
+    # ... (ピーク2-5も無効、value=None)
+    'acceleration-RMS': {'value': 0.0, 'unit': 'm/s2', 'unit_name': '加速度実効値'},
+    'kurtosis': {'value': 0.0, 'unit': '-', 'unit_name': '尖度'},
+    'temperature': {'value': 25, 'unit': '℃', 'unit_name': 'セルシウス温度'}
+}
+```
+
+**注意:**
+- FFT無効時や起動検知（閾値未満）の場合、ピーク周波数・加速度はペイロード内で`FFFFFF##`（無効値）として送信されます
+- 無効値は`value: None`として返されます（unit、unit_nameは設定されます）
 
 #### TemperatureAndHumiditySensor（温湿度センサー）
 
@@ -414,6 +450,45 @@ class FailedCheckSumPayload(MurataExceptionBase)
         "humidity": 60.2,
         "voltage": 3.2
     }
+}
+```
+
+### センサー値の形式
+
+各センサー値は以下の形式の辞書として返されます：
+
+```python
+{
+    'value': 25.3,              # 測定値（数値）または None（無効値の場合）
+    'unit': '℃',                # 単位
+    'unit_name': 'セルシウス温度'  # 単位名（日本語）
+}
+```
+
+#### 無効値の処理
+
+ペイロード内で無効値（`FFFFFF##`形式）が含まれる場合、`value`フィールドに`None`が設定されます。
+
+**無効値が発生する主なケース:**
+- 振動センサーのFFT無効時: ピーク周波数・加速度が無効
+- 起動検知で閾値未満の場合: 各種測定値が無効
+- 熱電対の基準温度未設定: 基準温度が無効
+- センサー異常時: 該当項目が無効
+
+**無効値の例:**
+```python
+# FFT無効時の振動センサーのピーク周波数
+{
+    'value': None,
+    'unit': 'Hz',
+    'unit_name': '周波数'
+}
+
+# 有効な温度値
+{
+    'value': 25.0,
+    'unit': '℃',
+    'unit_name': 'セルシウス温度'
 }
 ```
 
