@@ -5,23 +5,10 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 
-## このライブラリが解決する課題
+## 概要
 
 村田製作所の無線センサユニット（電文仕様G対応）は、UDPパケットでセンサーデータを送信します。
-しかし、このデータは独自のバイナリプロトコルで構成されており、直接扱うには複雑な解析処理が必要です。
-
-このライブラリは以下の課題を解決します:
-
-- 複雑なバイナリプロトコルの解析を抽象化し、Pythonの辞書形式でデータを取得
-- 20種類以上のセンサータイプに対応（温湿度、振動、電流、電圧など）
-- チェックサム検証による信頼性の高いデータ受信
-- コールバック方式で既存システム（データベース、MQTT、ファイル出力など）への組み込みが容易
-
-## 対象ユーザー
-
-- 村田製作所の無線センサユニットを使用するIoTシステム開発者
-- 工場・設備監視システムの開発者
-- センサーデータの収集・分析を行うデータエンジニア
+このライブラリではUDPパケットを受信・解析します。
 
 ## 特徴
 
@@ -504,14 +491,6 @@ pytest tests/test_murata_receiver.py
 pytest --cov=murata_sensor --cov-report=html
 ```
 
-## コントリビューション
-
-1. リポジトリをフォーク
-2. フィーチャーブランチを作成: `git checkout -b feature/new-sensor-support`
-3. 変更を加えてテストを追加
-4. テストを実行: `pytest`
-5. プルリクエストを送信
-
 ## ライセンス
 
-このプロジェクトはMITライセンスの下でライセンスされています。詳細は [LICENSE](LICENSE) ファイルを参照してください。
+MIT [LICENSE](LICENSE) 

@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ## [0.2.0] - 2026-03-23
 
 ### Added
+- ドキュメントバージョンGに対応
 - 振動センサー（1LZ）のFFT解析結果出力に対応
   - FFT有効時にピーク周波数（peak-frequency-1 ~ 5）を出力
   - FFT有効時にピーク加速度（peak-acceleration-1 ~ 5）を出力

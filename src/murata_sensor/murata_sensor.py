@@ -4,7 +4,6 @@ from typing import Any, Dict, List, Optional, Tuple
 from murata_sensor.murata_exception import *
 
 # 村田製作所　無線センサユニット　パケットフォーマット
-# ドキュメントバージョン B に対応
 
 # payloadの"センサデータ通知"項目に対応（0303[tt][SS] の 8 文字コード → センサータイプ名）
 SENSOR_TYPE = {

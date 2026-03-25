@@ -76,21 +76,16 @@ asyncio.run(main())
 |------------|------|
 | [architecture.md](architecture.md) | システムアーキテクチャ設計 |
 | [api_specification.md](api_specification.md) | API仕様書 |
-| [pypi_publishing_guide.md](pypi_publishing_guide.md) | PyPIパッケージ登録ガイド |
-| [pypi_checklist.md](pypi_checklist.md) | PyPI登録前チェックリスト |
-
-電文仕様書は `docs/confidential/murata_message_specifications.md`（git ignore 対象の場合はリポジトリに含まれない）。
 
 ## 変更履歴
 
-### v0.2.0 (予定)
+### v0.2.0 (現行)
 - **振動センサー1LZ**: FFT解析結果（ピーク周波数・加速度1-5）の出力に対応
 - **無効値処理**: ペイロード内の無効値（`FFFFFF##`）を`None`として明示的に返すように改善
 - **全センサー対応**: 小型熱電対2FWなど、すべてのセンサーで無効値が統一的に処理される
 
-### v0.1.0 (現行)
+### v0.1.0 
 - 初回リリース
-- 20種類以上のセンサータイプに対応
 - UDP受信、テキスト解析、非同期受信の機能を実装
 
 ## ディレクトリ構造
@@ -124,7 +119,7 @@ murata-sensor-receiver/
 ├── tests/                      # テストコード
 ├── docs/                       # ドキュメント（本ファイルは docs/overview.md）
 ├── pyproject.toml              # パッケージ設定
-└── README.md                   # プロジェクト説明（ルート）
+└── README.md                   # プロジェクト説明
 ```
 
 ## 対応センサー一覧
