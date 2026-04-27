@@ -29,6 +29,8 @@ SENSOR_CLASSES = {
     "analog_meter_reader": AnalogMeterReaderSensor,
     "vibration_2tf001_speed": Vibration2TF001SpeedSensor,
     "vibration_2tf001_accel": Vibration2TF001AccelSensor,
+    "waterproof_contact_pulse": WaterproofContactPulseSensor,
+    "waterproof_analog_output": WaterproofAnalogOutputSensor,
 }
 
 
