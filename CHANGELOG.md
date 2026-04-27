@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-04-27
+
+### Added
+- 防水防塵接点パルスユニット 2ZS に対応
+  - `030338FF` を `waterproof_contact_pulse` として識別
+  - 状態1-3、エッジカウント1-3、桁上がりカウント1-3を解析
+- 防水防塵アナログ出力無線化ユニット 2ZU に対応
+  - `030339FF` を `waterproof_analog_output` として識別
+  - 電流値1-3、電圧値1-3、測定モードを解析
+
+### Changed
+- README、API仕様書、概要ドキュメントの対応センサー一覧を更新
+
 ## [0.2.0] - 2026-03-23
 
 ### Added
