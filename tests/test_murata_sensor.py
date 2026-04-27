@@ -853,7 +853,8 @@ class TestAdditionalSensorTypes:
             "water_leak", "plg_duty", "brake_current_monitor",
             "vibration_with_instruction", "compact_thermocouple",
             "solar_external_sensor", "contact_output", "analog_meter_reader",
-            "vibration_2tf001_speed", "vibration_2tf001_accel"
+            "vibration_2tf001_speed", "vibration_2tf001_accel",
+            "waterproof_contact_pulse", "waterproof_analog_output"
         ]
         
         for sensor_type in expected_sensor_types:
@@ -1277,3 +1278,110 @@ class TestAsyncMurataReceiver:
         """__aiter__ が自身を返す"""
         receiver = AsyncMurataReceiver(port=0)
         assert receiver.__aiter__() is receiver
+
+
+class TestWaterproofContactPulseSensor:
+    """防水防塵接点パルスユニット 2ZS のテスト"""
+
+    def test_check_sensor_type(self):
+        """センサータイプの識別テスト"""
+        data = b"ERXDATA C473 0000 2D0C F000 57 6A 030338FF013F0532000610FA13C473FA00000068037C000700010068013400070001006800CF0007000000070001000700020007747D C473 7FFF"
+        assert MurataSensorBase.check_sensor_type(data) == "waterproof_contact_pulse"
+
+    def test_create_sensor(self):
+        """create_sensor で WaterproofContactPulseSensor が生成されることを確認"""
+        data = b"ERXDATA C473 0000 2D0C F000 57 6A 030338FF013F0532000610FA13C473FA00000068037C000700010068013400070001006800CF0007000000070001000700020007747D C473 7FFF"
+        addr = ("192.168.1.100", 55039)
+
+        sensor = create_sensor(data, addr)
+
+        assert sensor is not None
+        assert isinstance(sensor, WaterproofContactPulseSensor)
+
+    def test_sensor_values(self):
+        """センサー値の解析テスト（仕様書サンプル電文）"""
+        data = b"ERXDATA C473 0000 2D0C F000 57 6A 030338FF013F0532000610FA13C473FA00000068037C000700010068013400070001006800CF0007000000070001000700020007747D C473 7FFF"
+        addr = ("192.168.1.100", 55039)
+
+        sensor = WaterproofContactPulseSensor(data, addr)
+
+        # 基本情報のテスト
+        assert sensor.info["unit_id"] == "C473"
+        assert sensor.info["serial_number"] == "000610FA13C473FA"
+
+        # 電源電圧：013F (319) × 0.01 = 3.19V
+        assert sensor.values["power-supply-voltage"]["value"] == 3.19
+        assert sensor.values["power-supply-voltage"]["unit"] == "V"
+
+        # エッジカウント（仕様書: 892/308/207）
+        assert sensor.values["edge-count1"]["value"] == 892
+        assert sensor.values["edge-count2"]["value"] == 308
+        assert sensor.values["edge-count3"]["value"] == 207
+
+        # 桁上がりカウント（仕様書: 0/1/2）
+        assert sensor.values["carry-count1"]["value"] == 0
+        assert sensor.values["carry-count2"]["value"] == 1
+        assert sensor.values["carry-count3"]["value"] == 2
+
+        # 状態値の存在確認
+        assert "state1" in sensor.values
+        assert "state2" in sensor.values
+        assert "state3" in sensor.values
+
+    def test_sensor_class_structure(self):
+        """WaterproofContactPulseSensorクラスの構造テスト"""
+        assert hasattr(WaterproofContactPulseSensor, "retrieve_values")
+        assert issubclass(WaterproofContactPulseSensor, MurataSensorBase)
+
+
+class TestWaterproofAnalogOutputSensor:
+    """防水防塵アナログ出力無線化ユニット 2ZU のテスト"""
+
+    def test_check_sensor_type(self):
+        """センサータイプの識別テスト"""
+        data = b"ERXDATA C879 0000 2F57 F000 53 5A 030339FF01110532000610FA13C879FA0190056204B0056201900562FFFFFF32FFFFFF32FFFFFF32000000680778 C879 7FFF"
+        assert MurataSensorBase.check_sensor_type(data) == "waterproof_analog_output"
+
+    def test_create_sensor(self):
+        """create_sensor で WaterproofAnalogOutputSensor が生成されることを確認"""
+        data = b"ERXDATA C879 0000 2F57 F000 53 5A 030339FF01110532000610FA13C879FA0190056204B0056201900562FFFFFF32FFFFFF32FFFFFF32000000680778 C879 7FFF"
+        addr = ("192.168.1.100", 55039)
+
+        sensor = create_sensor(data, addr)
+
+        assert sensor is not None
+        assert isinstance(sensor, WaterproofAnalogOutputSensor)
+
+    def test_sensor_values(self):
+        """センサー値の解析テスト（仕様書サンプル電文）"""
+        data = b"ERXDATA C879 0000 2F57 F000 53 5A 030339FF01110532000610FA13C879FA0190056204B0056201900562FFFFFF32FFFFFF32FFFFFF32000000680778 C879 7FFF"
+        addr = ("192.168.1.100", 55039)
+
+        sensor = WaterproofAnalogOutputSensor(data, addr)
+
+        # 基本情報のテスト
+        assert sensor.info["unit_id"] == "C879"
+        assert sensor.info["serial_number"] == "000610FA13C879FA"
+
+        # 電源電圧：2.73V
+        assert sensor.values["power-supply-voltage"]["value"] == 2.73
+        assert sensor.values["power-supply-voltage"]["unit"] == "V"
+
+        # 電流値（仕様書: 4.00/12.00/4.00 mA）
+        assert sensor.values["current1"]["value"] == 4.0
+        assert sensor.values["current1"]["unit"] == "mA"
+        assert sensor.values["current2"]["value"] == 12.0
+        assert sensor.values["current3"]["value"] == 4.0
+
+        # 電圧値（仕様書: 無効）
+        assert sensor.values["voltage1"]["value"] is None
+        assert sensor.values["voltage2"]["value"] is None
+        assert sensor.values["voltage3"]["value"] is None
+
+        # 測定モード（仕様書: 0）
+        assert sensor.values["measurement-mode"]["value"] == 0
+
+    def test_sensor_class_structure(self):
+        """WaterproofAnalogOutputSensorクラスの構造テスト"""
+        assert hasattr(WaterproofAnalogOutputSensor, "retrieve_values")
+        assert issubclass(WaterproofAnalogOutputSensor, MurataSensorBase)

@@ -35,6 +35,8 @@ SENSOR_TYPE = {
     "03032F01": "vibration_2tf001_speed",  # 振動 2TF-001（速度モード）レンジオーバー
     "03033200": "vibration_2tf001_accel",  # 振動 2TF-001（加速度モード）
     "03033201": "vibration_2tf001_accel",  # 振動 2TF-001（加速度モード）レンジオーバー
+    "030338FF": "waterproof_contact_pulse",  # 防水防塵接点パルスユニット 2ZS
+    "030339FF": "waterproof_analog_output",  # 防水防塵アナログ出力無線化ユニット 2ZU
 }
 
 UNIT_TYPE = {
@@ -957,3 +959,59 @@ class Vibration2TF001AccelSensor(MurataSensorBase):
         self.values["kurtosis"] = self._get_value(self.payload[120:128])
         # センサデータ（温度）：[℃]
         self.values["temperature"] = self._get_value(self.payload[128:136])
+
+
+class WaterproofContactPulseSensor(MurataSensorBase):
+    """防水防塵接点パルスユニット 2ZS"""
+
+    def retrieve_values(self) -> None:
+        # 電源電圧：[V]
+        self.values["power-supply-voltage"] = self._get_value(self.payload[8:16])
+        # シリアルナンバー
+        serial_upper = self.payload[16:24].decode()
+        serial_lower = self.payload[24:32].decode()
+        self.info["serial_number"] = serial_upper + serial_lower
+        # 状態1
+        self.values["state1"] = self._get_value(self.payload[32:40])
+        # エッジカウント1：[回]
+        self.values["edge-count1"] = self._get_value(self.payload[40:48])
+        # 状態2
+        self.values["state2"] = self._get_value(self.payload[48:56])
+        # エッジカウント2：[回]
+        self.values["edge-count2"] = self._get_value(self.payload[56:64])
+        # 状態3
+        self.values["state3"] = self._get_value(self.payload[64:72])
+        # エッジカウント3：[回]
+        self.values["edge-count3"] = self._get_value(self.payload[72:80])
+        # 桁上がりカウント1：[回]
+        self.values["carry-count1"] = self._get_value(self.payload[80:88])
+        # 桁上がりカウント2：[回]
+        self.values["carry-count2"] = self._get_value(self.payload[88:96])
+        # 桁上がりカウント3：[回]
+        self.values["carry-count3"] = self._get_value(self.payload[96:104])
+
+
+class WaterproofAnalogOutputSensor(MurataSensorBase):
+    """防水防塵アナログ出力無線化ユニット 2ZU"""
+
+    def retrieve_values(self) -> None:
+        # 電源電圧：[V]
+        self.values["power-supply-voltage"] = self._get_value(self.payload[8:16])
+        # シリアルナンバー
+        serial_upper = self.payload[16:24].decode()
+        serial_lower = self.payload[24:32].decode()
+        self.info["serial_number"] = serial_upper + serial_lower
+        # センサデータ（電流値1）：[mA]
+        self.values["current1"] = self._get_value(self.payload[32:40])
+        # センサデータ（電流値2）：[mA]
+        self.values["current2"] = self._get_value(self.payload[40:48])
+        # センサデータ（電流値3）：[mA]
+        self.values["current3"] = self._get_value(self.payload[48:56])
+        # センサデータ（電圧値1）：[V]
+        self.values["voltage1"] = self._get_value(self.payload[56:64])
+        # センサデータ（電圧値2）：[V]
+        self.values["voltage2"] = self._get_value(self.payload[64:72])
+        # センサデータ（電圧値3）：[V]
+        self.values["voltage3"] = self._get_value(self.payload[72:80])
+        # 測定モード
+        self.values["measurement-mode"] = self._get_value(self.payload[80:88])

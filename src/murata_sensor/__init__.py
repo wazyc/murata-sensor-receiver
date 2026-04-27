@@ -53,6 +53,8 @@ from .murata_sensor import (
     AnalogMeterReaderSensor,
     Vibration2TF001SpeedSensor,
     Vibration2TF001AccelSensor,
+    WaterproofContactPulseSensor,
+    WaterproofAnalogOutputSensor,
     SENSOR_TYPE,
     UNIT_TYPE,
 )
@@ -94,6 +96,8 @@ __all__ = [
     "AnalogMeterReaderSensor",
     "Vibration2TF001SpeedSensor",
     "Vibration2TF001AccelSensor",
+    "WaterproofContactPulseSensor",
+    "WaterproofAnalogOutputSensor",
     # Constants
     "SENSOR_TYPE",
     "UNIT_TYPE",

@@ -12,14 +12,12 @@
 
 ## 対象ユーザー
 
-- 村田製作所の無線センサユニットを使用するIoTシステム開発者
-- 工場・設備監視システムの開発者
-- センサーデータの収集・分析を行うデータエンジニア
+- 村田製作所の無線センサユニットを使用するシステム開発者
 
 ## 主要機能
 
 1. UDP受信によるリアルタイムデータ取得
-2. 20種類以上のセンサータイプに対応（温湿度、振動、電流・電圧、熱電対、漏水、防水中継機など）
+2. 同シリーズのセンサーに対応（温湿度、振動、電流・電圧、熱電対、漏水、防水中継機など）
 3. コールバック方式による柔軟なデータ処理（data_callback / error_callback）
 4. 非同期（asyncio）対応: `AsyncMurataReceiver`、スレッド実行: `MurataReceiver.run_in_thread()`
 5. テキスト化された受信データからの解析: `parse_text_line()`（サンプル: `examples/parse_text.py`）
@@ -147,5 +145,7 @@ murata-sensor-receiver/
 | analog_meter_reader | アナログメーター読取ユニット | 2YT |
 | vibration_2tf001_speed | 振動 2TF-001 速度モード | 2TF-001 |
 | vibration_2tf001_accel | 振動 2TF-001 加速度モード | 2TF-001 |
+| waterproof_contact_pulse | 防水防塵接点パルスユニット | 2ZS |
+| waterproof_analog_output | 防水防塵アナログ出力無線化ユニット | 2ZU |
 
 詳細なセンサーコードと識別子は [api_specification.md](api_specification.md) を参照。

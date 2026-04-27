@@ -394,6 +394,8 @@ class VibrationSpeed(MurataSensorBase)
 - `AnalogMeterReaderSensor`: アナログメーター読取ユニット (2YT)
 - `Vibration2TF001SpeedSensor`: 振動 2TF-001 速度モード/低速回転モード
 - `Vibration2TF001AccelSensor`: 振動 2TF-001 加速度モード
+- `WaterproofContactPulseSensor`: 防水防塵接点パルスユニット (2ZS)
+- `WaterproofAnalogOutputSensor`: 防水防塵アナログ出力無線化ユニット (2ZU)
 
 ---
 
@@ -543,6 +545,10 @@ SENSOR_TYPE = {
     "03032F01": "vibration_2tf001_speed",   # 振動 2TF-001（速度モード）レンジオーバー
     "03033200": "vibration_2tf001_accel",   # 振動 2TF-001（加速度モード）
     "03033201": "vibration_2tf001_accel",   # 振動 2TF-001（加速度モード）レンジオーバー
+    
+    # 防水防塵ユニット
+    "030338FF": "waterproof_contact_pulse", # 防水防塵接点パルスユニット 2ZS
+    "030339FF": "waterproof_analog_output", # 防水防塵アナログ出力無線化ユニット 2ZU
 }
 ```
 
