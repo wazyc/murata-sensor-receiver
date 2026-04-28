@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- 対応済みセンサー一覧を取得するメタデータAPIを追加
+  - `get_supported_sensors()`
+  - `get_supported_sensor_types()`
+  - `is_supported_sensor_type()`
+  - `is_supported_sensor_code()`
+
+### Changed
+- README、API仕様書、概要ドキュメント、アーキテクチャ設計書の対応センサー記述を同期
+
 ## [0.3.0] - 2026-04-27
 
 ### Added
@@ -32,7 +42,7 @@ All notable changes to this project will be documented in this file.
 - 新しいテストスクリプトを追加
   - `examples/test_fft_modes.py`: FFT有効/無効時の動作確認
   - `examples/test_invalid_values.py`: 無効値処理の動作確認
-
+ 
 ### Changed
 - VibrationSensorクラスの出力項目を拡張（4項目→14項目、FFT有効時）
 - ドキュメントを全面更新

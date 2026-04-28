@@ -954,6 +954,57 @@ class TestAdditionalSensorTypes:
         for sensor_type in expected_sensor_types:
             assert sensor_type in SENSOR_CLASSES, f"Missing: {sensor_type}"
 
+    def test_get_supported_sensors_covers_all_sensor_type_codes(self):
+        """対応センサー一覧が全センサーコードを含むことを確認"""
+        from murata_sensor.murata_sensor import SENSOR_TYPE
+
+        sensors = get_supported_sensors()
+        supported_codes = {
+            code for sensor in sensors for code in sensor["type_codes"]
+        }
+
+        assert isinstance(sensors, tuple)
+        assert supported_codes == set(SENSOR_TYPE.keys())
+
+    def test_get_supported_sensors_groups_same_sensor_type_codes(self):
+        """同じセンサータイプの複数コードが1件に集約されることを確認"""
+        sensors = {
+            sensor["sensor_type"]: sensor for sensor in get_supported_sensors()
+        }
+
+        assert sensors["vibration"]["type_codes"] == ("03030900", "03030901")
+        assert sensors["solar_external_sensor"]["type_codes"] == (
+            "03033AFF",
+            "03033A00",
+            "03033A02",
+        )
+
+    def test_get_supported_sensor_types_matches_receiver_classes(self):
+        """対応センサータイプ一覧が生成可能クラスと一致することを確認"""
+        from murata_sensor.murata_receiver import SENSOR_CLASSES
+
+        assert set(get_supported_sensor_types()) == set(SENSOR_CLASSES.keys())
+
+    def test_supported_sensor_predicates(self):
+        """対応有無判定APIの正常系と未知値を確認"""
+        assert is_supported_sensor_type("temperature_and_humidity")
+        assert not is_supported_sensor_type("unknown_sensor")
+        assert is_supported_sensor_code("030301FF")
+        assert is_supported_sensor_code("030301ff")
+        assert not is_supported_sensor_code("FFFFFFFF")
+
+    def test_get_supported_sensors_returns_independent_values(self):
+        """返却値を変更しても次回取得結果へ影響しないことを確認"""
+        sensors = get_supported_sensors()
+        first_sensor = sensors[0]
+        first_sensor["description"] = "変更された説明"
+
+        fresh_sensors = get_supported_sensors()
+
+        assert fresh_sensors[0]["description"] != "変更された説明"
+        assert isinstance(fresh_sensors[0]["type_codes"], tuple)
+        assert isinstance(fresh_sensors[0]["products"], tuple)
+
 
 class TestEdgeCases:
     """エッジケース・異常系テスト"""

@@ -174,21 +174,40 @@ thread = receiver.run_in_thread()
 
 ## 対応センサータイプ
 
-| センサーコード | センサータイプ | 説明 |
-|-------------|-------------|-------------|
-| 030301FF | temperature_and_humidity | 温湿度センサー |
-| 03030900 | vibration | 振動センサー |
-| 030310FF | current_pulse | 電流・パルスセンサー |
-| 030313FF | voltage_pulse | 電圧・パルスセンサー |
-| 030312FF | CT | CTセンサー |
-| 030307FF | thermocouple | 熱電対センサー |
-| 03031800 | vibration_speed | 振動（速度）センサー |
-| 03031BFF | 3_current | 3電流センサー |
-| 03031CFF | 3_voltage | 3電圧センサー |
-| 03031DFF | 3_contacts | 3接点センサー |
-| 0303FEFF | waterproof_repeater | 防水中継機 |
-| 030338FF | waterproof_contact_pulse | 防水防塵接点パルスユニット |
-| 030339FF | waterproof_analog_output | 防水防塵アナログ出力無線化ユニット |
+| センサータイプ | センサーコード | 説明 | 製品例 |
+|-------------|-------------|------|--------|
+| temperature_and_humidity | 030301FF | 温湿度センサー | 1AN |
+| thermocouple | 030307FF | 3温度/熱電対センサー | 1EM/1PF |
+| current_pulse | 030310FF | 電流・パルスセンサー | 1MU |
+| voltage_pulse | 030313FF | 電圧・パルスセンサー | 1RU |
+| CT | 030312FF | CTセンサー | 1MT/1NT |
+| vibration | 03030900, 03030901 | 振動センサー（加速度） | 1LZ |
+| vibration_speed | 03031800, 03031801 | 振動センサー（速度） | 1TF |
+| 3_current | 03031BFF | 防水3電流センサー | 1ZU |
+| 3_voltage | 03031CFF | 防水3電圧センサー | 1ZV |
+| 3_contacts | 03031DFF | 防水3接点センサー | 1ZS |
+| water_leak | 03031EFF | 漏水センサー | 2AX |
+| waterproof_repeater | 0303FEFF | 防水中継機 | 2CL |
+| plg_duty | 030319FF | PLG Duty比監視ユニット | 2AU |
+| brake_current_monitor | 03032600 | 無線ブレーキ電流監視ユニット | 2DB |
+| vibration_with_instruction | 03032B00, 03032B01 | 計測指示機能付振動センサー | 2DN |
+| compact_thermocouple | 030331FF | 小型熱電対ユニット | 2FW |
+| solar_external_sensor | 03033AFF, 03033A00, 03033A02 | 外部センサ用ソーラーユニット | 2SL |
+| contact_output | 030330FF | 接点出力ユニット | 2ST |
+| analog_meter_reader | 030333FF | アナログメーター読取ユニット | 2YT |
+| vibration_2tf001_speed | 03032F00, 03032F01 | 振動 2TF-001 速度モード/低速回転モード | 2TF-001 |
+| vibration_2tf001_accel | 03033200, 03033201 | 振動 2TF-001 加速度モード | 2TF-001 |
+| waterproof_contact_pulse | 030338FF | 防水防塵接点パルスユニット | 2ZS |
+| waterproof_analog_output | 030339FF | 防水防塵アナログ出力無線化ユニット | 2ZU |
+
+対応済みセンサー一覧はAPIからも取得できます。設定画面や診断表示など、利用アプリ側で対応範囲を表示したい場合に使用します。
+
+```python
+from murata_sensor import get_supported_sensors
+
+for sensor in get_supported_sensors():
+    print(sensor["sensor_type"], sensor["type_codes"], sensor["products"])
+```
 
 ## 解析結果のデータ構造
 

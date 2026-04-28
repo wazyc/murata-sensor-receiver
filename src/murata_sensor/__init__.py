@@ -63,6 +63,10 @@ from .murata_sensor import (
     WaterproofAnalogOutputSensor,
     SENSOR_TYPE,
     UNIT_TYPE,
+    get_supported_sensor_types,
+    get_supported_sensors,
+    is_supported_sensor_code,
+    is_supported_sensor_type,
 )
 from .murata_exception import (
     MurataExceptionBase,
@@ -108,6 +112,11 @@ __all__ = [
     # Constants
     "SENSOR_TYPE",
     "UNIT_TYPE",
+    # Sensor metadata helpers
+    "get_supported_sensor_types",
+    "get_supported_sensors",
+    "is_supported_sensor_code",
+    "is_supported_sensor_type",
     # Exceptions
     "MurataExceptionBase",
     "FailedCheckSum",
