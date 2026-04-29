@@ -359,6 +359,39 @@ class TestParseTextLine:
         
         assert "未知のセンサータイプ" in str(exc_info.value)
     
+    def test_parse_unknown_sensor_type_non_strict(self):
+        """非strictモードでは未知センサーを未解析結果として返す"""
+        line = "2024/09/20 16:26:11 192.168.1.100/55061:ERXDATA 0002 0000 62BE F000 18 20 030399FF012605320C90052A11AF052C7C0002 7FFF"
+
+        result = parse_text_line(line, strict=False)
+
+        assert result["parsed"] is False
+        assert result["reason"] == "unsupported_sensor_type"
+        assert result["sensor_type_code"] == "99"
+        assert result["sensor_message_code"] == "030399FF"
+        assert result["source_ip"] == "192.168.1.100"
+        assert result["source_port"] == 55061
+        assert result["raw_data"].startswith(b"ERXDATA")
+
+    def test_parse_checksum_error_non_strict(self):
+        """非strictモードではチェックサムエラーも未解析結果として返す"""
+        line = "ERXDATA 8001 0000 1012 F000 2A 7A 03030900012F0532FFFFFF26FFFFFF0CFFFFFF26FFFFFF0CFFFFFF26FFFFFF0CFFFFFF26FFFFFF0CFFFFFF26FFFFFF0C00000063000000660019002A7199 8001 7FFF"
+
+        result = parse_text_line(line, strict=False)
+
+        assert result["parsed"] is False
+        assert result["reason"] == "checksum_error"
+        assert result["is_murata_format"] is True
+        assert isinstance(result["error"], FailedCheckSum)
+
+    def test_parse_no_erxdata_non_strict(self):
+        """非strictモードではERXDATAなしの行も未解析結果として返す"""
+        result = parse_text_line("INVALID DATA", strict=False)
+
+        assert result["parsed"] is False
+        assert result["reason"] == "erxdata_not_found"
+        assert result["is_murata_format"] is False
+
     def test_parse_raw_data_preserved(self):
         """raw_dataが正しく保持されているテスト"""
         line = "2024/09/20 16:26:11 192.168.1.100/55061:ERXDATA 5438 0000 1E75 F000 2F 7A 0303090001590532000C00260088050C002500260003040C005700260016050C00AF0026000F050C00BB0026000F050C00630563008705660D68052A0577 5438 7FFF"
@@ -534,6 +567,7 @@ class TestMurataReceiverUnit:
             assert receiver.buffer_size == 1024
             assert receiver.sensors == {}
             assert receiver.data_callback is None
+            assert receiver.unparsed_callback is None
             assert receiver.error_callback is None
     
     def test_receiver_with_custom_buffer_size(self):
@@ -555,14 +589,19 @@ class TestMurataReceiverUnit:
         
         def error_cb(exc, data, addr):
             pass
+
+        def unparsed_cb(data, addr):
+            pass
         
         with mock.patch('socket.socket'):
             receiver = MurataReceiver(
                 55039, 
                 data_callback=data_cb, 
+                unparsed_callback=unparsed_cb,
                 error_callback=error_cb
             )
             assert receiver.data_callback == data_cb
+            assert receiver.unparsed_callback == unparsed_cb
             assert receiver.error_callback == error_cb
     
     def test_make_sensor_valid_data(self):
@@ -733,6 +772,61 @@ class TestMurataReceiverUnit:
             
             assert len(callback_called) == 1
             assert callback_called[0][1] == addr
+
+    def test_unparsed_callback_invoked_for_unknown_sensor(self):
+        """未知センサーはデータコールバックではなく未解析コールバックへ渡す"""
+        import unittest.mock as mock
+        from murata_sensor.murata_receiver import MurataReceiver
+
+        data_callback_called = []
+        unparsed_callback_called = []
+
+        def data_callback(data, addr):
+            data_callback_called.append((data, addr))
+
+        def unparsed_callback(data, addr):
+            unparsed_callback_called.append((data, addr))
+
+        with mock.patch('socket.socket'):
+            receiver = MurataReceiver(
+                55039,
+                data_callback=data_callback,
+                unparsed_callback=unparsed_callback,
+            )
+
+            data = b"ERXDATA 0002 0000 62BE F000 18 20 030399FF012605320C90052A11AF052C7C0002 7FFF"
+            addr = ("192.168.1.100", 55061)
+
+            sensor = receiver.make_sensor(data, addr)
+            assert sensor is None
+            receiver._process_unparsed_data(
+                data,
+                addr,
+                reason=receiver._last_unparsed_reason,
+                error=receiver._last_unparsed_error,
+            )
+
+            assert data_callback_called == []
+            assert len(unparsed_callback_called) == 1
+            unparsed_data, callback_addr = unparsed_callback_called[0]
+            assert callback_addr == addr
+            assert unparsed_data["parsed"] is False
+            assert unparsed_data["reason"] == "unsupported_sensor_type"
+            assert unparsed_data["sensor_type_code"] == "99"
+            assert unparsed_data["raw_data"] == data
+
+    def test_build_unparsed_data_non_murata_format(self):
+        """未解析データ辞書で非村田形式を区別できる"""
+        data = b"INVALID DATA"
+        addr = ("192.168.1.100", 55061)
+
+        result = build_unparsed_data(data, addr)
+
+        assert result["parsed"] is False
+        assert result["reason"] == "non_murata_format"
+        assert result["is_murata_format"] is False
+        assert result["sensor_type_code"] is None
+        assert result["addr"] == addr
     
     def test_error_callback_on_callback_error(self):
         """コールバック内エラー時にエラーコールバックが呼ばれることを確認"""
@@ -1278,6 +1372,45 @@ class TestAsyncMurataReceiver:
         """__aiter__ が自身を返す"""
         receiver = AsyncMurataReceiver(port=0)
         assert receiver.__aiter__() is receiver
+
+    def test_async_receiver_include_unparsed_queues_unknown_sensor(self):
+        """include_unparsed=Trueでは未知センサーをキューへ投入する"""
+        from murata_sensor.async_receiver import _UDPReceiverProtocol
+        import logging
+
+        async def run() -> None:
+            queue = asyncio.Queue()
+            protocol = _UDPReceiverProtocol(
+                queue,
+                logging.getLogger("test_async_receiver"),
+                include_unparsed=True,
+            )
+            data = b"ERXDATA 0002 0000 62BE F000 18 20 030399FF012605320C90052A11AF052C7C0002 7FFF"
+            addr = ("192.168.1.100", 55061)
+
+            protocol.datagram_received(data, addr)
+            sensor_data, queued_addr = await queue.get()
+
+            assert queued_addr == addr
+            assert sensor_data["parsed"] is False
+            assert sensor_data["reason"] == "unsupported_sensor_type"
+            assert sensor_data["raw_data"] == data
+
+        asyncio.run(run())
+
+    def test_async_receiver_default_skips_unknown_sensor(self):
+        """デフォルトでは既存互換のため未知センサーをキューへ投入しない"""
+        from murata_sensor.async_receiver import _UDPReceiverProtocol
+        import logging
+
+        queue = asyncio.Queue()
+        protocol = _UDPReceiverProtocol(queue, logging.getLogger("test_async_receiver"))
+        data = b"ERXDATA 0002 0000 62BE F000 18 20 030399FF012605320C90052A11AF052C7C0002 7FFF"
+        addr = ("192.168.1.100", 55061)
+
+        protocol.datagram_received(data, addr)
+
+        assert queue.empty()
 
 
 class TestWaterproofContactPulseSensor:

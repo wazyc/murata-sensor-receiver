@@ -28,7 +28,13 @@ __email__ = "sensor-team@example.com"
 __license__ = "MIT"
 
 # Main classes and functions
-from .murata_receiver import MurataReceiver, SensorData, create_sensor, parse_text_line
+from .murata_receiver import (
+    MurataReceiver,
+    SensorData,
+    build_unparsed_data,
+    create_sensor,
+    parse_text_line,
+)
 from .async_receiver import AsyncMurataReceiver
 from .murata_sensor import (
     MurataSensorBase,
@@ -73,6 +79,7 @@ __all__ = [
     # Text parsing functions
     "parse_text_line",
     "create_sensor",
+    "build_unparsed_data",
     # Sensor classes
     "MurataSensorBase",
     "VibrationSensor",

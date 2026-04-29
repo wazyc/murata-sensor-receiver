@@ -9,15 +9,21 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, Optional, Tuple, cast
 
-from murata_sensor.murata_receiver import create_sensor
+from murata_sensor.murata_receiver import build_unparsed_data, create_sensor
 
 
 class _UDPReceiverProtocol(asyncio.DatagramProtocol):
     """UDP受信用のasyncio Protocol実装。受信データをキューに投入する。"""
 
-    def __init__(self, queue: asyncio.Queue, logger: logging.Logger):
+    def __init__(
+        self,
+        queue: asyncio.Queue,
+        logger: logging.Logger,
+        include_unparsed: bool = False,
+    ):
         self._queue = queue
         self._logger = logger
+        self._include_unparsed = include_unparsed
         self._transport: Optional[asyncio.DatagramTransport] = None
 
     def connection_made(self, transport: asyncio.BaseTransport) -> None:
@@ -27,6 +33,8 @@ class _UDPReceiverProtocol(asyncio.DatagramProtocol):
         try:
             sensor = create_sensor(data, addr)
             if sensor is None:
+                if self._include_unparsed:
+                    self._put_unparsed(data, addr)
                 return
             sensor_data: Dict[str, Any] = {
                 "sensor_type": sensor.check_sensor_type(sensor.data),
@@ -40,7 +48,22 @@ class _UDPReceiverProtocol(asyncio.DatagramProtocol):
             except asyncio.QueueFull:
                 self._logger.warning("受信キューが満杯のためデータを破棄しました")
         except Exception as e:
+            if self._include_unparsed:
+                self._put_unparsed(data, addr, error=e)
             self._logger.debug("パースエラー: %s", e)
+
+    def _put_unparsed(
+        self,
+        data: bytes,
+        addr: Tuple[str, int],
+        error: Optional[Exception] = None,
+    ) -> None:
+        """未解析データをキューへ投入する"""
+        unparsed_data = build_unparsed_data(data, addr, error=error)
+        try:
+            self._queue.put_nowait((unparsed_data, addr))
+        except asyncio.QueueFull:
+            self._logger.warning("受信キューが満杯のため未解析データを破棄しました")
 
     def error_received(self, exc: Optional[Exception]) -> None:
         if exc:
@@ -73,16 +96,19 @@ class AsyncMurataReceiver:
         port: int,
         buffer_size: int = 1024,
         logger: Optional[logging.Logger] = None,
+        include_unparsed: bool = False,
     ):
         """
         Args:
             port: 受信ポート番号
             buffer_size: 受信バッファサイズ（デフォルト1024）
             logger: ロガー（指定しない場合はデフォルトロガーを使用）
+            include_unparsed: Trueの場合、未解析データもイテレーションで返す
         """
         self.port = port
         self.buffer_size = buffer_size
         self.logger = logger or logging.getLogger(__name__)
+        self.include_unparsed = include_unparsed
         self._queue: asyncio.Queue = asyncio.Queue()
         self._transport: Optional[asyncio.DatagramTransport] = None
         self._protocol: Optional[_UDPReceiverProtocol] = None
@@ -98,7 +124,11 @@ class AsyncMurataReceiver:
         if self._running:
             return
         loop = asyncio.get_running_loop()
-        protocol = _UDPReceiverProtocol(self._queue, self.logger)
+        protocol = _UDPReceiverProtocol(
+            self._queue,
+            self.logger,
+            include_unparsed=self.include_unparsed,
+        )
         self._protocol = protocol
         self._transport, _ = await loop.create_datagram_endpoint(
             lambda: protocol,
