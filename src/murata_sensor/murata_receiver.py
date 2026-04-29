@@ -34,6 +34,79 @@ SENSOR_CLASSES = {
 }
 
 
+def _is_murata_sensor_data(data: bytes) -> bool:
+    """村田センサー形式かを安全に判定する"""
+    try:
+        return MurataSensorBase.is_murata_sensor_data(data)
+    except Exception:
+        return False
+
+
+def _extract_sensor_message_code(data: bytes) -> Optional[str]:
+    """ペイロード先頭のセンサー通知コード（0303[tt][SS]）を取得する"""
+    try:
+        message_code = data.decode("utf-8")[34:42]
+    except Exception:
+        return None
+    return message_code if len(message_code) == 8 else None
+
+
+def _extract_sensor_type_code(data: bytes) -> Optional[str]:
+    """センサ種別コード [tt] を取得する"""
+    message_code = _extract_sensor_message_code(data)
+    if message_code is None:
+        return None
+    return message_code[4:6]
+
+
+def _classify_unparsed_reason(data: bytes, error: Optional[Exception] = None) -> str:
+    """未解析データの理由を分類する"""
+    if error is not None:
+        if isinstance(error, FailedCheckSum):
+            return "checksum_error"
+        if isinstance(error, FailedCheckSumPayload):
+            return "payload_checksum_error"
+        return "parse_error"
+
+    if not _is_murata_sensor_data(data):
+        return "non_murata_format"
+
+    try:
+        sensor_type = MurataSensorBase.check_sensor_type(data)
+    except Exception:
+        return "parse_error"
+    if sensor_type is None or sensor_type not in SENSOR_TYPE.values():
+        return "unsupported_sensor_type"
+
+    return "parse_error"
+
+
+def build_unparsed_data(
+    raw_data: bytes,
+    addr: Tuple[Optional[str], Optional[int]] = (None, None),
+    reason: Optional[str] = None,
+    error: Optional[Exception] = None,
+    timestamp: Optional[Union[str, datetime]] = None,
+) -> Dict[str, Any]:
+    """解析できなかった受信データをアプリへ渡すための辞書を作成する"""
+    if timestamp is None:
+        timestamp_value: Union[str, datetime, None] = datetime.now().isoformat()
+    else:
+        timestamp_value = timestamp
+
+    return {
+        "parsed": False,
+        "raw_data": raw_data,
+        "addr": addr,
+        "timestamp": timestamp_value,
+        "reason": reason or _classify_unparsed_reason(raw_data, error),
+        "sensor_type_code": _extract_sensor_type_code(raw_data),
+        "sensor_message_code": _extract_sensor_message_code(raw_data),
+        "is_murata_format": _is_murata_sensor_data(raw_data),
+        "error": error,
+    }
+
+
 def create_sensor(
     data: bytes,
     addr: Tuple[Optional[str], Optional[int]] = (None, None),
@@ -72,7 +145,7 @@ def create_sensor(
     return None
 
 
-def parse_text_line(line: str) -> Dict[str, Any]:
+def parse_text_line(line: str, strict: bool = True) -> Dict[str, Any]:
     """テキスト行からセンサーデータを解析する
 
     ログファイルやCSVから取得したテキスト行を解析し、
@@ -86,6 +159,8 @@ def parse_text_line(line: str) -> Dict[str, Any]:
 
     Args:
         line: テキスト行
+        strict: Trueの場合は従来通り解析不能時に例外を送出する。
+            Falseの場合は未解析結果を辞書で返す。
 
     Returns:
         解析結果の辞書:
@@ -116,6 +191,12 @@ def parse_text_line(line: str) -> Dict[str, Any]:
     """
     line = line.strip()
     if not line:
+        if not strict:
+            return build_unparsed_data(
+                b"",
+                reason="empty_line",
+                timestamp=None,
+            )
         raise ValueError("空の文字列は解析できません")
 
     timestamp = None
@@ -126,6 +207,12 @@ def parse_text_line(line: str) -> Dict[str, Any]:
     # ERXDATAの位置を検索
     erxdata_index = line.find("ERXDATA")
     if erxdata_index == -1:
+        if not strict:
+            return build_unparsed_data(
+                line.encode("utf-8"),
+                reason="erxdata_not_found",
+                timestamp=None,
+            )
         raise ValueError("ERXDATAが見つかりません")
 
     # ERXDATAより前の部分を解析（タイムスタンプ、IP/ポート）
@@ -159,21 +246,66 @@ def parse_text_line(line: str) -> Dict[str, Any]:
     addr = (source_ip, source_port)
 
     # センサーオブジェクトを生成
-    sensor = create_sensor(raw_data, addr)
+    try:
+        sensor = create_sensor(raw_data, addr)
+    except Exception as e:
+        if not strict:
+            result = build_unparsed_data(
+                raw_data,
+                addr,
+                error=e,
+                timestamp=timestamp,
+            )
+            result.update(
+                {
+                    "source_ip": source_ip,
+                    "source_port": source_port,
+                }
+            )
+            return result
+        raise
+
     if sensor is None:
         # create_sensorがNoneを返した場合、村田センサーデータとして認識できない
         # または未知のセンサータイプ
-        if not MurataSensorBase.is_murata_sensor_data(raw_data):
+        if not _is_murata_sensor_data(raw_data):
+            if not strict:
+                result = build_unparsed_data(
+                    raw_data,
+                    addr,
+                    reason="non_murata_format",
+                    timestamp=timestamp,
+                )
+                result.update(
+                    {
+                        "source_ip": source_ip,
+                        "source_port": source_port,
+                    }
+                )
+                return result
             raise ValueError("村田センサーのデータ形式ではありません")
 
-        sensor_type_code = (
-            raw_data.decode("utf-8")[34:42] if len(raw_data) > 42 else "不明"
-        )
+        sensor_type_code = _extract_sensor_message_code(raw_data) or "不明"
+        if not strict:
+            result = build_unparsed_data(
+                raw_data,
+                addr,
+                reason="unsupported_sensor_type",
+                timestamp=timestamp,
+            )
+            result.update(
+                {
+                    "source_ip": source_ip,
+                    "source_port": source_port,
+                }
+            )
+            return result
         raise ValueError(f"未知のセンサータイプです: {sensor_type_code}")
 
     sensor_type = MurataSensorBase.check_sensor_type(raw_data)
 
     return {
+        "parsed": True,
         "timestamp": timestamp,
         "source_ip": source_ip,
         "source_port": source_port,
@@ -230,6 +362,9 @@ class MurataReceiver:
             Callable[[Exception, bytes, Tuple[str, int]], None]
         ] = None,
         logger: Optional[logging.Logger] = None,
+        unparsed_callback: Optional[
+            Callable[[Dict[str, Any], Tuple[str, int]], None]
+        ] = None,
     ):
         """
         Args:
@@ -238,12 +373,16 @@ class MurataReceiver:
             data_callback: センサーデータ受信時のコールバック関数
             error_callback: エラー発生時のコールバック関数
             logger: ロガーインスタンス（指定しない場合はデフォルトロガーを使用）
+            unparsed_callback: 未解析データ受信時のコールバック関数
         """
         self.port = port
         self.buffer_size = buffer_size
         self.sensors: Dict[Tuple[str, int], SensorData] = {}
         self.data_callback = data_callback
+        self.unparsed_callback = unparsed_callback
         self.error_callback = error_callback
+        self._last_unparsed_error: Optional[Exception] = None
+        self._last_unparsed_reason: Optional[str] = None
         self._setup_socket()
 
         # ロガーの設定
@@ -291,8 +430,44 @@ class MurataReceiver:
                 if sensor:
                     self._update_sensor_data(addr, sensor)
                     self._process_sensor_data(addr, sensor)
+                else:
+                    self._process_unparsed_data(
+                        data,
+                        addr,
+                        reason=self._last_unparsed_reason,
+                        error=self._last_unparsed_error,
+                    )
             except Exception as e:
                 self.logger.error(f"Error processing data from {addr}: {e}")
+                if self.error_callback:
+                    try:
+                        self.error_callback(e, data, addr)
+                    except Exception as callback_error:
+                        self.logger.error(f"Error in error callback: {callback_error}")
+
+    def _process_unparsed_data(
+        self,
+        data: bytes,
+        addr: Tuple[str, int],
+        reason: Optional[str] = None,
+        error: Optional[Exception] = None,
+    ) -> None:
+        """解析できなかった受信データを未解析データ用コールバックへ渡す"""
+        unparsed_data = build_unparsed_data(data, addr, reason=reason, error=error)
+
+        self.logger.warning(
+            "Unparsed sensor data from %s:%s reason=%s sensor_message_code=%s",
+            addr[0],
+            addr[1],
+            unparsed_data["reason"],
+            unparsed_data["sensor_message_code"],
+        )
+
+        if self.unparsed_callback:
+            try:
+                self.unparsed_callback(unparsed_data, addr)
+            except Exception as e:
+                self.logger.error(f"Error in unparsed callback: {e}")
                 if self.error_callback:
                     try:
                         self.error_callback(e, data, addr)
@@ -401,16 +576,19 @@ class MurataReceiver:
         Returns:
             生成したセンサーオブジェクト。不正なデータの場合はNone
         """
+        self._last_unparsed_error = None
+        self._last_unparsed_reason = None
         try:
-            if not MurataSensorBase.is_murata_sensor_data(data):
+            if not _is_murata_sensor_data(data):
                 self.logger.warning("Unknown sensor data received")
+                self._last_unparsed_reason = "non_murata_format"
                 return None
 
             sensor_type = MurataSensorBase.check_sensor_type(data)
             if sensor_type is None or sensor_type not in SENSOR_TYPE.values():
-                d = data.decode("utf-8")
-                c = d[34:42]
+                c = _extract_sensor_message_code(data) or "不明"
                 self.logger.warning(f"Unknown sensor type: {c}")
+                self._last_unparsed_reason = "unsupported_sensor_type"
                 return None
 
             return cast(
@@ -420,6 +598,8 @@ class MurataReceiver:
 
         except Exception as e:
             self.logger.error(f"Error creating sensor object: {str(e)}")
+            self._last_unparsed_error = e
+            self._last_unparsed_reason = _classify_unparsed_reason(data, e)
             return None
 
     def _create_sensor_instance(

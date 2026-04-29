@@ -18,11 +18,12 @@
 
 1. UDP受信によるリアルタイムデータ取得
 2. 同シリーズのセンサーに対応（温湿度、振動、電流・電圧、熱電対、漏水、防水中継機など）
-3. コールバック方式によるデータ処理（data_callback / error_callback）
+3. コールバック方式によるデータ処理（data_callback / unparsed_callback / error_callback）
 4. 非同期（asyncio）対応: `AsyncMurataReceiver`、スレッド実行: `MurataReceiver.run_in_thread()`
 5. テキスト化された受信データからの解析: `parse_text_line()`（サンプル: `examples/parse_text.py`）
 6. 自動チェックサム検証
 7. 無効値の自動検出とNone変換（FFT無効時のピーク値、熱電対の基準温度など）
+8. 未対応センサーや解析不能データのraw data通知
 
 ## 使用方法
 
@@ -34,7 +35,15 @@ from murata_sensor import MurataReceiver
 def on_data(sensor_data, addr):
     print(sensor_data['sensor_type'], sensor_data['values'])
 
-receiver = MurataReceiver(port=55039, data_callback=on_data)
+def on_unparsed(unparsed_data, addr):
+    # UDPは再受信できないため、未解析データを保存して後日再解析できるようにします。
+    print(unparsed_data['reason'], unparsed_data['sensor_type_code'])
+
+receiver = MurataReceiver(
+    port=55039,
+    data_callback=on_data,
+    unparsed_callback=on_unparsed,
+)
 receiver.recv()
 ```
 
@@ -48,6 +57,18 @@ result = parse_text_line(line)
 print(result['sensor_type'], result['values'])
 ```
 
+未対応センサーを含むログを処理し続けたい場合は、`strict=False` を指定します。
+
+```python
+result = parse_text_line(line, strict=False)
+if result['parsed']:
+    print(result['sensor_type'], result['values'])
+else:
+    print(result['reason'], result['sensor_type_code'])
+    # raw_dataを保存して、ライブラリ更新後に再解析できます。
+    save_raw_packet(result['raw_data'])
+```
+
 ### 非同期（asyncio）での使用
 
 ```python
@@ -55,11 +76,14 @@ import asyncio
 from murata_sensor import AsyncMurataReceiver
 
 async def main():
-    receiver = AsyncMurataReceiver(port=55039)
+    receiver = AsyncMurataReceiver(port=55039, include_unparsed=True)
     await receiver.start()
     try:
         async for sensor_data, addr in receiver:
-            print(sensor_data['sensor_type'], sensor_data['values'])
+            if sensor_data.get('parsed') is False:
+                print(sensor_data['reason'], sensor_data['sensor_type_code'])
+            else:
+                print(sensor_data['sensor_type'], sensor_data['values'])
     finally:
         await receiver.stop()
 
