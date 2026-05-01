@@ -39,6 +39,143 @@ SENSOR_TYPE = {
     "030339FF": "waterproof_analog_output",  # 防水防塵アナログ出力無線化ユニット 2ZU
 }
 
+# 対応センサー一覧APIで返す補助情報。
+# センサーコードの正はSENSOR_TYPEに置き、ここでは表示用メタデータだけを管理する。
+SENSOR_METADATA = {
+    "temperature_and_humidity": {
+        "description": "温湿度センサー",
+        "products": ("1AN",),
+    },
+    "thermocouple": {
+        "description": "3温度/熱電対センサー",
+        "products": ("1EM", "1PF"),
+    },
+    "current_pulse": {
+        "description": "電流・パルスセンサー",
+        "products": ("1MU",),
+    },
+    "voltage_pulse": {
+        "description": "電圧・パルスセンサー",
+        "products": ("1RU",),
+    },
+    "CT": {
+        "description": "CTセンサー",
+        "products": ("1MT", "1NT"),
+    },
+    "vibration": {
+        "description": "振動センサー（加速度）",
+        "products": ("1LZ",),
+    },
+    "vibration_speed": {
+        "description": "振動センサー（速度）",
+        "products": ("1TF",),
+    },
+    "3_current": {
+        "description": "防水3電流センサー",
+        "products": ("1ZU",),
+    },
+    "3_voltage": {
+        "description": "防水3電圧センサー",
+        "products": ("1ZV",),
+    },
+    "3_contacts": {
+        "description": "防水3接点センサー",
+        "products": ("1ZS",),
+    },
+    "water_leak": {
+        "description": "漏水センサー",
+        "products": ("2AX",),
+    },
+    "waterproof_repeater": {
+        "description": "防水中継機",
+        "products": ("2CL",),
+    },
+    "plg_duty": {
+        "description": "PLG Duty比監視ユニット",
+        "products": ("2AU",),
+    },
+    "brake_current_monitor": {
+        "description": "無線ブレーキ電流監視ユニット",
+        "products": ("2DB",),
+    },
+    "vibration_with_instruction": {
+        "description": "計測指示機能付振動センサー",
+        "products": ("2DN",),
+    },
+    "compact_thermocouple": {
+        "description": "小型熱電対ユニット",
+        "products": ("2FW",),
+    },
+    "solar_external_sensor": {
+        "description": "外部センサ用ソーラーユニット",
+        "products": ("2SL",),
+    },
+    "contact_output": {
+        "description": "接点出力ユニット",
+        "products": ("2ST",),
+    },
+    "analog_meter_reader": {
+        "description": "アナログメーター読取ユニット",
+        "products": ("2YT",),
+    },
+    "vibration_2tf001_speed": {
+        "description": "振動 2TF-001 速度モード/低速回転モード",
+        "products": ("2TF-001",),
+    },
+    "vibration_2tf001_accel": {
+        "description": "振動 2TF-001 加速度モード",
+        "products": ("2TF-001",),
+    },
+    "waterproof_contact_pulse": {
+        "description": "防水防塵接点パルスユニット",
+        "products": ("2ZS",),
+    },
+    "waterproof_analog_output": {
+        "description": "防水防塵アナログ出力無線化ユニット",
+        "products": ("2ZU",),
+    },
+}
+
+
+def get_supported_sensor_types() -> Tuple[str, ...]:
+    """対応済みセンサータイプの一覧を返す"""
+    return tuple(dict.fromkeys(SENSOR_TYPE.values()))
+
+
+def get_supported_sensors() -> Tuple[Dict[str, Any], ...]:
+    """対応済みセンサーのメタデータ一覧を返す
+
+    Returns:
+        センサータイプ、対応コード、説明、製品例を含む辞書のタプル。
+    """
+    type_codes: Dict[str, List[str]] = {}
+    for code, sensor_type in SENSOR_TYPE.items():
+        type_codes.setdefault(sensor_type, []).append(code)
+
+    sensors = []
+    for sensor_type in get_supported_sensor_types():
+        metadata = SENSOR_METADATA.get(sensor_type, {})
+        sensors.append(
+            {
+                "sensor_type": sensor_type,
+                "type_codes": tuple(type_codes[sensor_type]),
+                "description": metadata.get("description", ""),
+                "products": tuple(metadata.get("products", ())),
+            }
+        )
+
+    return tuple(sensors)
+
+
+def is_supported_sensor_type(sensor_type: str) -> bool:
+    """指定したセンサータイプに対応しているかを返す"""
+    return sensor_type in SENSOR_TYPE.values()
+
+
+def is_supported_sensor_code(type_code: str) -> bool:
+    """指定したセンサーコードに対応しているかを返す"""
+    return type_code.upper() in SENSOR_TYPE
+
 UNIT_TYPE = {
     "01": {"name": "Duty比", "unit": "%"},
     "02": {"name": "圧力", "unit": "Pa"},

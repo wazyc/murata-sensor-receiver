@@ -150,30 +150,30 @@ murata-sensor-receiver/
 
 ## 対応センサー一覧
 
-| センサー名（sensor_type） | 説明 | 製品例 |
-|---------------------------|------|--------|
-| temperature_and_humidity | 温湿度センサー | 1AN |
-| vibration | 振動センサー（加速度） | 1LZ |
-| vibration_speed | 振動センサー（速度） | 1TF |
-| current_pulse | 電流・パルスセンサー | 1MU |
-| voltage_pulse | 電圧・パルスセンサー | 1RU |
-| CT | CTセンサー | 1MT/1NT |
-| thermocouple | 3温度/熱電対センサー | 1EM/1PF |
-| 3_current | 防水3電流センサー | 1ZU |
-| 3_voltage | 防水3電圧センサー | 1ZV |
-| 3_contacts | 防水3接点センサー | 1ZS |
-| water_leak | 漏水センサー | 2AX |
-| waterproof_repeater | 防水中継機 | 2CL |
-| plg_duty | PLG Duty比監視ユニット | 2AU |
-| brake_current_monitor | 無線ブレーキ電流監視 | 2DB |
-| vibration_with_instruction | 計測指示機能付振動センサー | 2DN |
-| compact_thermocouple | 小型熱電対ユニット | 2FW |
-| solar_external_sensor | 外部センサ用ソーラーユニット | 2SL |
-| contact_output | 接点出力ユニット | 2ST |
-| analog_meter_reader | アナログメーター読取ユニット | 2YT |
-| vibration_2tf001_speed | 振動 2TF-001 速度モード | 2TF-001 |
-| vibration_2tf001_accel | 振動 2TF-001 加速度モード | 2TF-001 |
-| waterproof_contact_pulse | 防水防塵接点パルスユニット | 2ZS |
-| waterproof_analog_output | 防水防塵アナログ出力無線化ユニット | 2ZU |
+| センサー名（sensor_type） | センサーコード | 説明 | 製品例 |
+|---------------------------|----------------|------|--------|
+| temperature_and_humidity | 030301FF | 温湿度センサー | 1AN |
+| thermocouple | 030307FF | 3温度/熱電対センサー | 1EM/1PF |
+| current_pulse | 030310FF | 電流・パルスセンサー | 1MU |
+| voltage_pulse | 030313FF | 電圧・パルスセンサー | 1RU |
+| CT | 030312FF | CTセンサー | 1MT/1NT |
+| vibration | 03030900, 03030901 | 振動センサー（加速度） | 1LZ |
+| vibration_speed | 03031800, 03031801 | 振動センサー（速度） | 1TF |
+| 3_current | 03031BFF | 防水3電流センサー | 1ZU |
+| 3_voltage | 03031CFF | 防水3電圧センサー | 1ZV |
+| 3_contacts | 03031DFF | 防水3接点センサー | 1ZS |
+| water_leak | 03031EFF | 漏水センサー | 2AX |
+| waterproof_repeater | 0303FEFF | 防水中継機 | 2CL |
+| plg_duty | 030319FF | PLG Duty比監視ユニット | 2AU |
+| brake_current_monitor | 03032600 | 無線ブレーキ電流監視ユニット | 2DB |
+| vibration_with_instruction | 03032B00, 03032B01 | 計測指示機能付振動センサー | 2DN |
+| compact_thermocouple | 030331FF | 小型熱電対ユニット | 2FW |
+| solar_external_sensor | 03033AFF, 03033A00, 03033A02 | 外部センサ用ソーラーユニット | 2SL |
+| contact_output | 030330FF | 接点出力ユニット | 2ST |
+| analog_meter_reader | 030333FF | アナログメーター読取ユニット | 2YT |
+| vibration_2tf001_speed | 03032F00, 03032F01 | 振動 2TF-001 速度モード/低速回転モード | 2TF-001 |
+| vibration_2tf001_accel | 03033200, 03033201 | 振動 2TF-001 加速度モード | 2TF-001 |
+| waterproof_contact_pulse | 030338FF | 防水防塵接点パルスユニット | 2ZS |
+| waterproof_analog_output | 030339FF | 防水防塵アナログ出力無線化ユニット | 2ZU |
 
-詳細なセンサーコードと識別子は [api_specification.md](api_specification.md) を参照。
+対応済みセンサー一覧は `get_supported_sensors()` からも取得できる。詳細なAPIは [api_specification.md](api_specification.md) を参照。

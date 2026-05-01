@@ -421,6 +421,8 @@ class MurataReceiver:
     def recv(self) -> None:
         """センサーデータを継続的に受信する"""
         while True:  # 常に受信待ち
+            data = b""
+            addr: Tuple[str, int] = ("", 0)
             try:
                 data, addr = self.udp_serv_sock.recvfrom(self.buffer_size)  # 受信
                 self.logger.info(f"Received data from {addr}")
