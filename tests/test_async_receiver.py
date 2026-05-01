@@ -4,10 +4,8 @@ import logging
 from murata_sensor.async_receiver import _UDPReceiverProtocol
 from murata_sensor.murata_exception import FailedCheckSum
 
-
 VALID_TEMPERATURE_DATA = (
-    b"ERXDATA 0002 0000 62BE F000 18 20 "
-    b"030301FF012605320C90052A11AF052C7C0002 7FFF"
+    b"ERXDATA 0002 0000 62BE F000 18 20 " b"030301FF012605320C90052A11AF052C7C0002 7FFF"
 )
 INVALID_CHECKSUM_DATA = (
     b"ERXDATA 8001 0000 1012 F000 2A 7A "
