@@ -4,15 +4,28 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-05-01
+
 ### Added
-- 対応済みセンサー一覧を取得するメタデータAPIを追加
+- 対応済みセンサー一覧を取得するメタデータAPI
   - `get_supported_sensors()`
   - `get_supported_sensor_types()`
   - `is_supported_sensor_type()`
   - `is_supported_sensor_code()`
+- 未解析データの扱い（UDP受信・テキスト解析・非同期受信）
+  - `MurataReceiver` / `AsyncMurataReceiver` に `unparsed_callback` を追加
+  - 未解析理由の分類（チェックサム不正、非村田形式、未対応センサー種別など）
+  - `build_unparsed_data()` による未解析ペイロード辞書の生成
+  - `parse_text_line(..., strict=False)` で未解析行を辞書として返却可能に
+  - `AsyncMurataReceiver` の `include_unparsed` オプション
+- GitHub Actions による CI（テスト・Lint）
+- flake8 設定ファイル（`.flake8`）
 
 ### Changed
+- ビルド・配布まわりの整理（レガシーなアップロード用スクリプト削除、`MANIFEST.in` の除外設定見直し）
+- README の開発環境セットアップ（flake8 等）を更新
 - README、API仕様書、概要ドキュメント、アーキテクチャ設計書の対応センサー記述を同期
+- 非同期受信のテストで `asyncio.run` を用いたイベントループ管理に統一
 
 ## [0.3.0] - 2026-04-27
 
