@@ -1435,8 +1435,13 @@ class TestAsyncMurataReceiver:
 
     def test_async_receiver_aiter_returns_self(self):
         """__aiter__ が自身を返す"""
-        receiver = AsyncMurataReceiver(port=0)
-        assert receiver.__aiter__() is receiver
+
+        async def run() -> None:
+            # AsyncMurataReceiver.__init__ 内で asyncio.Queue() が作られるためループが必要
+            receiver = AsyncMurataReceiver(port=0)
+            assert receiver.__aiter__() is receiver
+
+        asyncio.run(run())
 
     def test_async_receiver_include_unparsed_queues_unknown_sensor(self):
         """include_unparsed=Trueでは未知センサーをキューへ投入する"""
@@ -1468,14 +1473,19 @@ class TestAsyncMurataReceiver:
         from murata_sensor.async_receiver import _UDPReceiverProtocol
         import logging
 
-        queue = asyncio.Queue()
-        protocol = _UDPReceiverProtocol(queue, logging.getLogger("test_async_receiver"))
-        data = b"ERXDATA 0002 0000 62BE F000 18 20 030399FF012605320C90052A11AF052C7C0002 7FFF"
-        addr = ("192.168.1.100", 55061)
+        async def run() -> None:
+            queue = asyncio.Queue()
+            protocol = _UDPReceiverProtocol(
+                queue, logging.getLogger("test_async_receiver")
+            )
+            data = b"ERXDATA 0002 0000 62BE F000 18 20 030399FF012605320C90052A11AF052C7C0002 7FFF"
+            addr = ("192.168.1.100", 55061)
 
-        protocol.datagram_received(data, addr)
+            protocol.datagram_received(data, addr)
 
-        assert queue.empty()
+            assert queue.empty()
+
+        asyncio.run(run())
 
 
 class TestWaterproofContactPulseSensor:
