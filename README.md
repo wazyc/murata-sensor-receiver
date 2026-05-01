@@ -486,6 +486,8 @@ git clone https://github.com/wazyc/murata-sensor-receiver.git
 cd murata-sensor-receiver
 
 # 開発用依存関係のインストール
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -e ".[dev]"
 
 # テスト実行
@@ -493,6 +495,7 @@ pytest
 
 # コードフォーマット
 black src/murata_sensor/
+flake8 src/ tests/
 
 # 型チェック
 mypy src/murata_sensor/

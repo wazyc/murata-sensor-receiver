@@ -1,0 +1,43 @@
+name: テスト
+
+# mainブランチへのpushと、プルリクエスト作成時に自動実行
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Python ${{ matrix.python-version }} でテスト実行
+    runs-on: ubuntu-latest
+
+    # 3つのPythonバージョンで並列実行
+    strategy:
+      fail-fast: false  # 1つ失敗しても他のバージョンのテストは続ける
+      matrix:
+        python-version: ["3.9", "3.11", "3.12"]
+
+    steps:
+      # リポジトリのコードを取得
+      - name: コードをチェックアウト
+        uses: actions/checkout@v4
+
+      # 指定バージョンのPythonをセットアップ
+      - name: Python ${{ matrix.python-version }} をセットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip  # pipキャッシュで2回目以降の実行を高速化
+
+      # 開発用依存パッケージをインストール（pytest, flake8 など）
+      - name: 依存パッケージをインストール
+        run: pip install -e ".[dev]"
+
+      # コードスタイルと品質チェック
+      - name: flake8 でコード品質チェック
+        run: flake8 src/ tests/
+
+      # テスト実行（カバレッジレポート付き）
+      - name: pytest でテストを実行
+        run: pytest

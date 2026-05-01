@@ -176,6 +176,7 @@ def is_supported_sensor_code(type_code: str) -> bool:
     """指定したセンサーコードに対応しているかを返す"""
     return type_code.upper() in SENSOR_TYPE
 
+
 UNIT_TYPE = {
     "01": {"name": "Duty比", "unit": "%"},
     "02": {"name": "圧力", "unit": "Pa"},
@@ -417,18 +418,18 @@ class MurataSensorBase(object):
         """
         scale = val_hex_text[4:6]
         unit = val_hex_text[6:8]
-        
+
         # 無効値判定: データ部分がFFFFまたはスケールがFF
         data_hex = val_hex_text[0:4].decode()
         scale_str = scale.decode()
-        
+
         if data_hex == "FFFF" or scale_str == "FF":
             return {
                 "value": None,
                 "unit": UNIT_TYPE[unit.decode()]["unit"],
                 "unit_name": UNIT_TYPE[unit.decode()]["name"],
             }
-        
+
         return {
             "value": round(int(data_hex, 16) * SCALE[scale_str], 10),
             "unit": UNIT_TYPE[unit.decode()]["unit"],
@@ -499,7 +500,7 @@ class MurataSensorBase(object):
 
 class VibrationSensor(MurataSensorBase):
     """振動ユニット（加速度版 1LZ）
-    
+
     FFT有効時: ピーク周波数・加速度1-5を含む全14項目を出力
     FFT無効時: ピーク値は無効（value=None）として出力
     """

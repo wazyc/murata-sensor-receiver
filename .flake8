@@ -1,0 +1,11 @@
+# black の line-length=88 と整合させる（既定79だと E501 が大量発生する）
+# E203: black と競合するスライス内スペース規則のため無視
+[flake8]
+max-line-length = 88
+extend-ignore = E203
+exclude = .git, .venv, __pycache__, build, dist, *.egg-info
+# スターインポートは公開API再エクスポートの都合上許容し、F403/F405 は対象ファイルのみ無視
+per-file-ignores =
+    src/murata_sensor/murata_receiver.py:F403,F405
+    src/murata_sensor/murata_sensor.py:F403,F405
+    tests/test_murata_sensor.py:F403,F405,E501
