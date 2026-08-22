@@ -1,6 +1,7 @@
 include README.md
 include LICENSE
 include CHANGELOG.md
+include .flake8
 recursive-include examples *.py
 recursive-exclude docs/confidential *
 recursive-exclude tests *

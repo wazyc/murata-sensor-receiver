@@ -19,6 +19,8 @@ All notable changes to this project will be documented in this file.
   - `is_supported_sensor_type()`
   - `is_supported_sensor_code()`
 - `get_supported_sensors()` に `parse_verified` を追加し、実電文による値解析の自動テスト済み範囲を明示
+- GitHub Actions による CI（テスト・Lint）
+- flake8 設定ファイル（`.flake8`）
 
 ### Changed
 - README、API仕様書、概要ドキュメント、アーキテクチャ設計書の対応センサー記述を同期
@@ -98,4 +100,4 @@ This project adheres to Semantic Versioning:
 
 ---
 
-**Note**: v0.x.x is alpha/beta and the API may change.
+**Note**: v1.0.0 以降は安定版として扱います。破壊的変更がある場合はメジャーバージョンを上げます。
