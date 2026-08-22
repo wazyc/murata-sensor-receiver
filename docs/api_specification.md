@@ -337,7 +337,10 @@ def get_supported_sensors() -> Tuple[Dict[str, Any], ...]
 ```
 
 **説明:**
-このライブラリが解析対応しているセンサーの詳細なメタデータ一覧を返します。センサータイプだけでなく、対応するセンサーコード、説明、製品例も必要な場合に使用します。利用アプリの設定画面、診断表示、対応センサー一覧表示などに適しています。
+
+このライブラリが解析対応しているセンサーの詳細なメタデータ一覧を返します。センサータイプだけでなく、対応するセンサーコード、説明、製品例、値解析の自動検証有無（`parse_verified`）も必要な場合に使用します。利用アプリの設定画面、診断表示、対応センサー一覧表示などに適しています。
+
+「対応」はセンサーコード登録と解析クラスの存在を意味します。`parse_verified=True` は実電文による主要 values の自動テスト済み、`False` は登録済みだが値解析の自動検証が未整備であることを示します。
 
 **戻り値:**
 ```python
@@ -347,6 +350,7 @@ def get_supported_sensors() -> Tuple[Dict[str, Any], ...]
         "type_codes": ("030301FF",),
         "description": "温湿度センサー",
         "products": ("1AN",),
+        "parse_verified": True,
     },
     ...
 )
@@ -357,7 +361,7 @@ def get_supported_sensors() -> Tuple[Dict[str, Any], ...]
 from murata_sensor import get_supported_sensors
 
 for sensor in get_supported_sensors():
-    print(sensor["sensor_type"], sensor["type_codes"])
+    print(sensor["sensor_type"], sensor["type_codes"], sensor["parse_verified"])
 ```
 
 ---
@@ -625,21 +629,33 @@ class FailedCheckSumPayload(MurataExceptionBase)
 
 ### センサーデータ辞書
 
+`data_callback` / `AsyncMurataReceiver` のイテレーションで渡される解析済みデータの形式:
+
 ```python
 {
+    "sensor_type": "vibration",         # センサータイプ名
+    "sensor_type_code": "09",           # センサ種別コード [tt]（16進2桁）
+    "timestamp": "2024-06-13T10:30:00", # ISO形式のタイムスタンプ
+    "values": {                         # センサー値（キー毎に下記形式）
+        "temperature": {
+            "value": 25.3,
+            "unit": "℃",
+            "unit_name": "セルシウス温度",
+        },
+    },
+    "info": {                           # センサー情報
+        "unit_id": "8001",
+        "RSSI": -45,
+        "route": "...",
+        "sensor_type_code": "09",
+        "status": {"code": "00", "description": "正常"},
+        # ...
+    },
     "addr": ("192.168.1.100", 55039),   # 送信元アドレス
-    "RSSI": -45,                        # 受信信号強度
-    "route": "...",                     # 経路情報
-    "timestamp": "2024-06-13T10:30:00", # タイムスタンプ
-    "sensor_type": "vibration",         # センサータイプ
-    "sensor_type_code": "09",           # センサ種別コード [tt]（16進2桁, 仕様書「センサ種別」の値）
-    "values": {                         # センサー値（センサータイプ毎に異なる）
-        "temperature": 25.3,
-        "humidity": 60.2,
-        "voltage": 3.2
-    }
 }
 ```
+
+`RSSI` / `route` / `unit_id` などはトップレベルではなく `info` 内に格納される。
 
 ### センサー値の形式
 
@@ -682,7 +698,7 @@ class FailedCheckSumPayload(MurataExceptionBase)
 
 ### センサータイプ識別子
 
-対応センサーコードは `SENSOR_TYPE` で定義されています。利用アプリから対応範囲を参照する場合は、直接定数を読むのではなく `get_supported_sensors()` を使用してください。
+対応センサーコードは `SENSOR_TYPE` で定義されています。利用アプリから対応範囲を参照する場合は、直接定数を読むのではなく `get_supported_sensors()` を使用してください。値解析の自動テスト済み範囲は戻り値の `parse_verified` で判定できます。
 
 ```python
 SENSOR_TYPE = {

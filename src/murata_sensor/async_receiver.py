@@ -6,10 +6,13 @@
 
 import asyncio
 import logging
-from datetime import datetime
 from typing import Any, Dict, Optional, Tuple, cast
 
-from murata_sensor.murata_receiver import build_unparsed_data, create_sensor
+from murata_sensor.murata_receiver import (
+    build_sensor_data,
+    build_unparsed_data,
+    create_sensor,
+)
 
 
 class _UDPReceiverProtocol(asyncio.DatagramProtocol):
@@ -36,13 +39,7 @@ class _UDPReceiverProtocol(asyncio.DatagramProtocol):
                 if self._include_unparsed:
                     self._put_unparsed(data, addr)
                 return
-            sensor_data: Dict[str, Any] = {
-                "sensor_type": sensor.check_sensor_type(sensor.data),
-                "timestamp": datetime.now().isoformat(),
-                "values": sensor.values,
-                "info": sensor.info,
-                "addr": addr,
-            }
+            sensor_data = build_sensor_data(sensor, addr)
             try:
                 self._queue.put_nowait((sensor_data, addr))
             except asyncio.QueueFull:
@@ -166,7 +163,8 @@ class AsyncMurataReceiver:
 
         Returns:
             (sensor_data, addr) のタプル。
-            sensor_data は 'sensor_type', 'timestamp', 'values', 'info', 'addr' を持つ辞書。
+            sensor_data は 'sensor_type', 'sensor_type_code', 'timestamp',
+            'values', 'info', 'addr' を持つ辞書。
 
         Raises:
             StopAsyncIteration: stop() が呼ばれた場合

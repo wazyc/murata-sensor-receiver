@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-08-22
+
+### Fixed
+- Async 解析済みデータに `sensor_type_code` を追加（Sync と共通の `build_sensor_data`）
+- `SolarExternalSensor` の緯度・経度を values 規約 `{value, unit, unit_name}` に統一
+- 振動系センサータイプ全体で SS=00/01 の状態解析（正常/レンジオーバー）を適用
+- README / API仕様書を実装のコールバック経路・データ形状に合わせて修正
+
+### Added
+- 対応済みセンサー一覧を取得するメタデータAPIを追加
+  - `get_supported_sensors()`
+  - `get_supported_sensor_types()`
+  - `is_supported_sensor_type()`
+  - `is_supported_sensor_code()`
+- `get_supported_sensors()` に `parse_verified` を追加し、実電文による値解析の自動テスト済み範囲を明示
+
+### Changed
+- README、API仕様書、概要ドキュメント、アーキテクチャ設計書の対応センサー記述を同期
+- 対応センサー一覧で「登録済み」と「解析検証済み」を区別して記載
+
 ## [0.3.0] - 2026-04-27
 
 ### Added
@@ -32,7 +52,7 @@ All notable changes to this project will be documented in this file.
 - 新しいテストスクリプトを追加
   - `examples/test_fft_modes.py`: FFT有効/無効時の動作確認
   - `examples/test_invalid_values.py`: 無効値処理の動作確認
-
+ 
 ### Changed
 - VibrationSensorクラスの出力項目を拡張（4項目→14項目、FFT有効時）
 - ドキュメントを全面更新

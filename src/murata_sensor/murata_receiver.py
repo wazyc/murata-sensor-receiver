@@ -107,6 +107,29 @@ def build_unparsed_data(
     }
 
 
+def build_sensor_data(
+    sensor: "MurataSensorBase",
+    addr: Tuple[str, int],
+) -> Dict[str, Any]:
+    """解析済みセンサーデータを Sync/Async 共通の辞書形式に変換する
+
+    Args:
+        sensor: 解析済みセンサーオブジェクト
+        addr: 送信元アドレス
+
+    Returns:
+        data_callback / async for で渡すセンサーデータ辞書
+    """
+    return {
+        "sensor_type": sensor.check_sensor_type(sensor.data),
+        "sensor_type_code": sensor.info.get("sensor_type_code"),
+        "timestamp": datetime.now().isoformat(),
+        "values": sensor.values,
+        "info": sensor.info,
+        "addr": addr,
+    }
+
+
 def create_sensor(
     data: bytes,
     addr: Tuple[Optional[str], Optional[int]] = (None, None),
@@ -421,6 +444,8 @@ class MurataReceiver:
     def recv(self) -> None:
         """センサーデータを継続的に受信する"""
         while True:  # 常に受信待ち
+            data = b""
+            addr: Tuple[str, int] = ("", 0)
             try:
                 data, addr = self.udp_serv_sock.recvfrom(self.buffer_size)  # 受信
                 self.logger.info(f"Received data from {addr}")
@@ -498,15 +523,8 @@ class MurataReceiver:
             addr: 送信元アドレス
             sensor: センサーデータ
         """
-        # センサーデータをディクショナリ形式に変換
-        sensor_data = {
-            "sensor_type": sensor.check_sensor_type(sensor.data),
-            "sensor_type_code": sensor.info.get("sensor_type_code"),
-            "timestamp": datetime.now().isoformat(),
-            "values": sensor.values,
-            "info": sensor.info,
-            "addr": addr,
-        }
+        # センサーデータをディクショナリ形式に変換（Async と共通）
+        sensor_data = build_sensor_data(sensor, addr)
 
         # デフォルトのログ出力
         self.logger.info("=" * 80)

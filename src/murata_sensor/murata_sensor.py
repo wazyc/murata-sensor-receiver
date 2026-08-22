@@ -39,6 +39,173 @@ SENSOR_TYPE = {
     "030339FF": "waterproof_analog_output",  # 防水防塵アナログ出力無線化ユニット 2ZU
 }
 
+# 対応センサー一覧APIで返す補助情報。
+# センサーコードの正はSENSOR_TYPEに置き、ここでは表示用メタデータだけを管理する。
+#
+# parse_verified:
+#   True  = 仕様サンプル等の実電文で主要 values を自動テスト済み
+#   False = SENSOR_TYPE / クラス登録済みだが、値解析の自動検証は未整備
+SENSOR_METADATA = {
+    "temperature_and_humidity": {
+        "description": "温湿度センサー",
+        "products": ("1AN",),
+        "parse_verified": True,
+    },
+    "thermocouple": {
+        "description": "3温度/熱電対センサー",
+        "products": ("1EM", "1PF"),
+        "parse_verified": True,
+    },
+    "current_pulse": {
+        "description": "電流・パルスセンサー",
+        "products": ("1MU",),
+        "parse_verified": False,
+    },
+    "voltage_pulse": {
+        "description": "電圧・パルスセンサー",
+        "products": ("1RU",),
+        "parse_verified": False,
+    },
+    "CT": {
+        "description": "CTセンサー",
+        "products": ("1MT", "1NT"),
+        "parse_verified": False,
+    },
+    "vibration": {
+        "description": "振動センサー（加速度）",
+        "products": ("1LZ",),
+        "parse_verified": True,
+    },
+    "vibration_speed": {
+        "description": "振動センサー（速度）",
+        "products": ("1TF",),
+        "parse_verified": False,
+    },
+    "3_current": {
+        "description": "防水3電流センサー",
+        "products": ("1ZU",),
+        "parse_verified": True,
+    },
+    "3_voltage": {
+        "description": "防水3電圧センサー",
+        "products": ("1ZV",),
+        "parse_verified": True,
+    },
+    "3_contacts": {
+        "description": "防水3接点センサー",
+        "products": ("1ZS",),
+        "parse_verified": True,
+    },
+    "water_leak": {
+        "description": "漏水センサー",
+        "products": ("2AX",),
+        "parse_verified": False,
+    },
+    "waterproof_repeater": {
+        "description": "防水中継機",
+        "products": ("2CL",),
+        "parse_verified": True,
+    },
+    "plg_duty": {
+        "description": "PLG Duty比監視ユニット",
+        "products": ("2AU",),
+        "parse_verified": False,
+    },
+    "brake_current_monitor": {
+        "description": "無線ブレーキ電流監視ユニット",
+        "products": ("2DB",),
+        "parse_verified": False,
+    },
+    "vibration_with_instruction": {
+        "description": "計測指示機能付振動センサー",
+        "products": ("2DN",),
+        "parse_verified": False,
+    },
+    "compact_thermocouple": {
+        "description": "小型熱電対ユニット",
+        "products": ("2FW",),
+        "parse_verified": False,
+    },
+    "solar_external_sensor": {
+        "description": "外部センサ用ソーラーユニット",
+        "products": ("2SL",),
+        "parse_verified": False,
+    },
+    "contact_output": {
+        "description": "接点出力ユニット",
+        "products": ("2ST",),
+        "parse_verified": False,
+    },
+    "analog_meter_reader": {
+        "description": "アナログメーター読取ユニット",
+        "products": ("2YT",),
+        "parse_verified": False,
+    },
+    "vibration_2tf001_speed": {
+        "description": "振動 2TF-001 速度モード/低速回転モード",
+        "products": ("2TF-001",),
+        "parse_verified": False,
+    },
+    "vibration_2tf001_accel": {
+        "description": "振動 2TF-001 加速度モード",
+        "products": ("2TF-001",),
+        "parse_verified": False,
+    },
+    "waterproof_contact_pulse": {
+        "description": "防水防塵接点パルスユニット",
+        "products": ("2ZS",),
+        "parse_verified": True,
+    },
+    "waterproof_analog_output": {
+        "description": "防水防塵アナログ出力無線化ユニット",
+        "products": ("2ZU",),
+        "parse_verified": True,
+    },
+}
+
+
+def get_supported_sensor_types() -> Tuple[str, ...]:
+    """対応済みセンサータイプの一覧を返す"""
+    return tuple(dict.fromkeys(SENSOR_TYPE.values()))
+
+
+def get_supported_sensors() -> Tuple[Dict[str, Any], ...]:
+    """対応済みセンサーのメタデータ一覧を返す
+
+    Returns:
+        センサータイプ、対応コード、説明、製品例、parse_verified を含む辞書のタプル。
+        parse_verified が True のものは実電文による主要値の自動テスト済み。
+        False はクラス登録済みだが値解析の自動検証が未整備であることを示す。
+    """
+    type_codes: Dict[str, List[str]] = {}
+    for code, sensor_type in SENSOR_TYPE.items():
+        type_codes.setdefault(sensor_type, []).append(code)
+
+    sensors = []
+    for sensor_type in get_supported_sensor_types():
+        metadata = SENSOR_METADATA.get(sensor_type, {})
+        sensors.append(
+            {
+                "sensor_type": sensor_type,
+                "type_codes": tuple(type_codes[sensor_type]),
+                "description": metadata.get("description", ""),
+                "products": tuple(metadata.get("products", ())),
+                "parse_verified": bool(metadata.get("parse_verified", False)),
+            }
+        )
+
+    return tuple(sensors)
+
+
+def is_supported_sensor_type(sensor_type: str) -> bool:
+    """指定したセンサータイプに対応しているかを返す"""
+    return sensor_type in SENSOR_TYPE.values()
+
+
+def is_supported_sensor_code(type_code: str) -> bool:
+    """指定したセンサーコードに対応しているかを返す"""
+    return type_code.upper() in SENSOR_TYPE
+
 UNIT_TYPE = {
     "01": {"name": "Duty比", "unit": "%"},
     "02": {"name": "圧力", "unit": "Pa"},
@@ -224,6 +391,17 @@ class MurataSensorBase(object):
         sensor_status = self.payload[6:8].decode()
         self.info["status"] = self._parse_sensor_status(sensor_status)
 
+    # SS=00/01（正常/レンジオーバー）を使う振動系センサータイプ
+    _VIBRATION_STATUS_TYPES = frozenset(
+        {
+            "vibration",
+            "vibration_speed",
+            "vibration_with_instruction",
+            "vibration_2tf001_speed",
+            "vibration_2tf001_accel",
+        }
+    )
+
     def _parse_sensor_status(self, status: str) -> Dict[str, Any]:
         """センサー状態を解析する
 
@@ -233,7 +411,7 @@ class MurataSensorBase(object):
         Returns:
             状態を示す辞書
         """
-        if self.check_sensor_type(self.data) == "vibration":
+        if self.check_sensor_type(self.data) in self._VIBRATION_STATUS_TYPES:
             return {
                 "code": status,
                 "description": "正常" if status == "00" else "レンジオーバー",
@@ -811,10 +989,18 @@ class SolarExternalSensor(MurataSensorBase):
         if len(self.payload) > 160:
             # 緯度（x10000000[deg]）
             lat_raw = int(self.payload[144:152].decode(), 16)
-            self.values["latitude"] = lat_raw / 10000000.0
+            self.values["latitude"] = {
+                "value": lat_raw / 10000000.0,
+                "unit": "deg",
+                "unit_name": "度",
+            }
             # 経度（x10000000[deg]）
             lon_raw = int(self.payload[152:160].decode(), 16)
-            self.values["longitude"] = lon_raw / 10000000.0
+            self.values["longitude"] = {
+                "value": lon_raw / 10000000.0,
+                "unit": "deg",
+                "unit_name": "度",
+            }
 
 
 class ContactOutputSensor(MurataSensorBase):
