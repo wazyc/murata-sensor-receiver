@@ -30,9 +30,19 @@ def test_datagram_received_valid_packet_queues_sensor_data():
 
         assert queued_addr == addr
         assert sensor_data["sensor_type"] == "temperature_and_humidity"
+        assert sensor_data["sensor_type_code"] == "01"
         assert sensor_data["addr"] == addr
         assert sensor_data["values"]
         assert sensor_data["info"]["unit_id"] == "0002"
+        # Sync の data_callback と同じキー集合
+        assert set(sensor_data.keys()) == {
+            "sensor_type",
+            "sensor_type_code",
+            "timestamp",
+            "values",
+            "info",
+            "addr",
+        }
 
     asyncio.run(run())
 

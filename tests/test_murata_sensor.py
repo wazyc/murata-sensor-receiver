@@ -1,8 +1,41 @@
 import asyncio
 import pytest
 from datetime import datetime
+from unittest.mock import patch
+
 from murata_sensor import *
-from murata_sensor.murata_receiver import create_sensor, parse_text_line
+from murata_sensor.murata_receiver import build_sensor_data, create_sensor, parse_text_line
+
+
+def _rebuild_packet_checksums(data: bytearray) -> bytes:
+    """ペイロード／電文チェックサムを再計算して正当な電文にする"""
+    payload_len = int(data[31:33], 16)
+    if payload_len % 8 != 0:
+        payload = data[34 : 34 + payload_len]
+        result = 0
+        for byte in payload[:-2]:
+            result ^= byte
+        data[34 + payload_len - 2 : 34 + payload_len] = format(result, "02X").encode()
+
+    target = bytes(data[: 33 + 1 + payload_len])
+    result = 0
+    for byte in target:
+        result ^= byte
+    cs_start = 33 + payload_len + 1
+    data[cs_start : cs_start + 2] = format(result, "02X").encode()
+    return bytes(data)
+
+
+def _vibration_packet_with_type_code(type_code: bytes) -> bytes:
+    """振動系テスト電文のセンサ種別コード（8文字）を差し替えて返す"""
+    data = bytearray(
+        b"ERXDATA 8001 0000 1012 F000 2A 7A "
+        b"03030900012F0532FFFFFF26FFFFFF0CFFFFFF26FFFFFF0CFFFFFF26FFFFFF0C"
+        b"FFFFFF26FFFFFF0CFFFFFF26FFFFFF0C00000063000000660019002A7170 "
+        b"8001 7FFF"
+    )
+    data[34:42] = type_code
+    return _rebuild_packet_checksums(data)
 
 
 class TestModel(object):
@@ -907,6 +940,49 @@ class TestAdditionalSensorTypes:
         """SolarExternalSensorクラスの構造テスト"""
         assert hasattr(SolarExternalSensor, 'retrieve_values')
         assert issubclass(SolarExternalSensor, MurataSensorBase)
+
+    def test_solar_latitude_longitude_values_convention(self):
+        """Solar 緯度経度が values 規約 {value, unit, unit_name} に従うこと"""
+        sensor = object.__new__(SolarExternalSensor)
+        sensor.values = {}
+        sensor.info = {}
+        # 緯度 35.0deg / 経度 139.0deg（×10000000 の16進）
+        lat_hex = f"{int(35.0 * 10000000):08X}".encode()
+        lon_hex = f"{int(139.0 * 10000000):08X}".encode()
+        sensor.payload = b"0" * 144 + lat_hex + lon_hex + b"0000"
+        assert len(sensor.payload) > 160
+
+        dummy = {"value": 1.0, "unit": "V", "unit_name": "ボルト"}
+        with patch.object(SolarExternalSensor, "_get_value", return_value=dummy):
+            sensor.retrieve_values()
+
+        assert isinstance(sensor.values["latitude"], dict)
+        assert sensor.values["latitude"]["value"] == 35.0
+        assert sensor.values["latitude"]["unit"] == "deg"
+        assert sensor.values["latitude"]["unit_name"] == "度"
+        assert isinstance(sensor.values["longitude"], dict)
+        assert sensor.values["longitude"]["value"] == 139.0
+        assert sensor.values["longitude"]["unit"] == "deg"
+        assert sensor.values["longitude"]["unit_name"] == "度"
+
+        # Sync ログ相当の走査が TypeError にならないこと
+        for key, value in sensor.values.items():
+            assert "value" in value
+            assert "unit" in value
+            _ = f"{value['value']} {value['unit']}"
+
+    def test_solar_short_payload_omits_latitude_longitude(self):
+        """Solar の短いペイロードでは緯度経度キーを出力しないこと"""
+        sensor = object.__new__(SolarExternalSensor)
+        sensor.values = {}
+        sensor.info = {}
+        sensor.payload = b"0" * 136  # <= 160 のため緯度経度なし
+        dummy = {"value": 1.0, "unit": "V", "unit_name": "ボルト"}
+        with patch.object(SolarExternalSensor, "_get_value", return_value=dummy):
+            sensor.retrieve_values()
+
+        assert "latitude" not in sensor.values
+        assert "longitude" not in sensor.values
     
     def test_contact_output_sensor_class_structure(self):
         """ContactOutputSensorクラスの構造テスト"""
@@ -1004,6 +1080,65 @@ class TestAdditionalSensorTypes:
         assert fresh_sensors[0]["description"] != "変更された説明"
         assert isinstance(fresh_sensors[0]["type_codes"], tuple)
         assert isinstance(fresh_sensors[0]["products"], tuple)
+
+    def test_sensor_metadata_covers_all_sensor_types(self):
+        """SENSOR_METADATA が SENSOR_TYPE の全タイプをカバーし必須項目が揃うこと"""
+        from murata_sensor.murata_sensor import SENSOR_METADATA, SENSOR_TYPE
+
+        assert set(SENSOR_METADATA.keys()) == set(SENSOR_TYPE.values())
+        for sensor_type, metadata in SENSOR_METADATA.items():
+            assert metadata.get("description"), sensor_type
+            assert metadata.get("products"), sensor_type
+            assert isinstance(metadata.get("parse_verified"), bool), sensor_type
+
+    def test_parse_verified_matches_known_sample_covered_types(self):
+        """実電文で values を検証済みのタイプだけ parse_verified=True であること"""
+        verified = {
+            sensor["sensor_type"]
+            for sensor in get_supported_sensors()
+            if sensor["parse_verified"]
+        }
+        assert verified == {
+            "temperature_and_humidity",
+            "thermocouple",
+            "vibration",
+            "3_current",
+            "3_voltage",
+            "3_contacts",
+            "waterproof_repeater",
+            "waterproof_contact_pulse",
+            "waterproof_analog_output",
+        }
+
+
+class TestBuildSensorData:
+    """Sync/Async 共通の build_sensor_data テスト"""
+
+    def test_build_sensor_data_includes_sensor_type_code_and_keys(self):
+        """解析済みセンサーから共通キー集合と sensor_type_code を返す"""
+        addr = ("192.168.1.100", 55061)
+        data = (
+            b"ERXDATA 0002 0000 62BE F000 18 20 "
+            b"030301FF012605320C90052A11AF052C7C0002 7FFF"
+        )
+        sensor = TemperatureAndHumiditySensor(data, addr)
+
+        sensor_data = build_sensor_data(sensor, addr)
+
+        assert set(sensor_data.keys()) == {
+            "sensor_type",
+            "sensor_type_code",
+            "timestamp",
+            "values",
+            "info",
+            "addr",
+        }
+        assert sensor_data["sensor_type"] == "temperature_and_humidity"
+        assert sensor_data["sensor_type_code"] == "01"
+        assert sensor_data["sensor_type_code"] == sensor.info["sensor_type_code"]
+        assert sensor_data["addr"] == addr
+        assert sensor_data["values"] is sensor.values
+        assert sensor_data["info"] is sensor.info
 
 
 class TestEdgeCases:
@@ -1142,19 +1277,60 @@ class TestEdgeCases:
         assert sensor.info['status']['code'] == 'FF'
     
     def test_vibration_sensor_range_over_status(self):
-        """振動センサーのレンジオーバー状態テスト（ステータスコードの確認）"""
-        # 振動センサーのステータスコード:
-        # "00" -> 正常
-        # "01" -> レンジオーバー
-        # この確認はセンサー状態解析ロジックのテスト
-        
-        status_mapping = {
-            "00": "正常",
-            "01": "レンジオーバー"
+        """振動センサー実電文で SS=01 がレンジオーバーになること"""
+        addr = ("192.168.1.100", 1234)
+        data = _vibration_packet_with_type_code(b"03030901")
+        sensor = VibrationSensor(data, addr)
+
+        assert sensor.check_sensor_type(sensor.data) == "vibration"
+        assert sensor.info["status"] == {
+            "code": "01",
+            "description": "レンジオーバー",
         }
-        
-        assert status_mapping["00"] == "正常"
-        assert status_mapping["01"] == "レンジオーバー"
+        # Sync/Async 共通経路でも status が保持されること
+        sensor_data = build_sensor_data(sensor, addr)
+        assert sensor_data["info"]["status"]["description"] == "レンジオーバー"
+        assert sensor_data["sensor_type_code"] == "09"
+
+    def test_vibration_family_status_parsing(self):
+        """振動系タイプ全体で実電文経路の SS=00/01 が正常/レンジオーバーになること"""
+        from murata_sensor.murata_receiver import SENSOR_CLASSES
+
+        addr = ("192.168.1.100", 1234)
+        cases = [
+            (b"03030900", "vibration", "正常"),
+            (b"03030901", "vibration", "レンジオーバー"),
+            (b"03031800", "vibration_speed", "正常"),
+            (b"03031801", "vibration_speed", "レンジオーバー"),
+            (b"03032B00", "vibration_with_instruction", "正常"),
+            (b"03032B01", "vibration_with_instruction", "レンジオーバー"),
+            (b"03032F00", "vibration_2tf001_speed", "正常"),
+            (b"03032F01", "vibration_2tf001_speed", "レンジオーバー"),
+            (b"03033200", "vibration_2tf001_accel", "正常"),
+            (b"03033201", "vibration_2tf001_accel", "レンジオーバー"),
+        ]
+        for type_code, sensor_type, description in cases:
+            cls = SENSOR_CLASSES[sensor_type]
+            # ペイロード形状差による値解析失敗を避け、状態解析経路を検証する
+            with patch.object(cls, "retrieve_values", lambda self: None):
+                sensor = cls(_vibration_packet_with_type_code(type_code), addr)
+            assert sensor.info["status"] == {
+                "code": type_code[6:8].decode(),
+                "description": description,
+            }, type_code.decode()
+
+    def test_vibration_status_types_match_sensor_type_codes(self):
+        """_VIBRATION_STATUS_TYPES が SENSOR_TYPE の振動系と一致すること"""
+        from murata_sensor.murata_sensor import SENSOR_TYPE
+
+        expected = {
+            sensor_type
+            for code, sensor_type in SENSOR_TYPE.items()
+            if (code.endswith("00") or code.endswith("01"))
+            and sensor_type.startswith("vibration")
+        }
+        # brake_current_monitor など vibration 以外の *00 は除外済み
+        assert MurataSensorBase._VIBRATION_STATUS_TYPES == expected
     
     def test_invalid_timestamp_format(self):
         """不正なタイムスタンプ形式のテスト"""

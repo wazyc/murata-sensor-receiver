@@ -4,6 +4,15 @@ import pytest
 
 from murata_sensor.murata_receiver import MurataReceiver
 
+EXPECTED_SENSOR_DATA_KEYS = {
+    "sensor_type",
+    "sensor_type_code",
+    "timestamp",
+    "values",
+    "info",
+    "addr",
+}
+
 
 VALID_TEMPERATURE_DATA = (
     b"ERXDATA 0002 0000 62BE F000 18 20 "
@@ -58,6 +67,8 @@ def test_recv_valid_packet_updates_storage_and_invokes_callback():
     sensor_data, callback_addr = callback_results[0]
     assert callback_addr == addr
     assert sensor_data["sensor_type"] == "temperature_and_humidity"
+    assert sensor_data["sensor_type_code"] == "01"
+    assert set(sensor_data.keys()) == EXPECTED_SENSOR_DATA_KEYS
     assert "temperature" in sensor_data["values"]
 
 
