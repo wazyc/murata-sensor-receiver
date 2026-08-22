@@ -174,31 +174,35 @@ thread = receiver.run_in_thread()
 
 ## 対応センサータイプ
 
-| センサータイプ | センサーコード | 説明 | 製品例 |
-|-------------|-------------|------|--------|
-| temperature_and_humidity | 030301FF | 温湿度センサー | 1AN |
-| thermocouple | 030307FF | 3温度/熱電対センサー | 1EM/1PF |
-| current_pulse | 030310FF | 電流・パルスセンサー | 1MU |
-| voltage_pulse | 030313FF | 電圧・パルスセンサー | 1RU |
-| CT | 030312FF | CTセンサー | 1MT/1NT |
-| vibration | 03030900, 03030901 | 振動センサー（加速度） | 1LZ |
-| vibration_speed | 03031800, 03031801 | 振動センサー（速度） | 1TF |
-| 3_current | 03031BFF | 防水3電流センサー | 1ZU |
-| 3_voltage | 03031CFF | 防水3電圧センサー | 1ZV |
-| 3_contacts | 03031DFF | 防水3接点センサー | 1ZS |
-| water_leak | 03031EFF | 漏水センサー | 2AX |
-| waterproof_repeater | 0303FEFF | 防水中継機 | 2CL |
-| plg_duty | 030319FF | PLG Duty比監視ユニット | 2AU |
-| brake_current_monitor | 03032600 | 無線ブレーキ電流監視ユニット | 2DB |
-| vibration_with_instruction | 03032B00, 03032B01 | 計測指示機能付振動センサー | 2DN |
-| compact_thermocouple | 030331FF | 小型熱電対ユニット | 2FW |
-| solar_external_sensor | 03033AFF, 03033A00, 03033A02 | 外部センサ用ソーラーユニット | 2SL |
-| contact_output | 030330FF | 接点出力ユニット | 2ST |
-| analog_meter_reader | 030333FF | アナログメーター読取ユニット | 2YT |
-| vibration_2tf001_speed | 03032F00, 03032F01 | 振動 2TF-001 速度モード/低速回転モード | 2TF-001 |
-| vibration_2tf001_accel | 03033200, 03033201 | 振動 2TF-001 加速度モード | 2TF-001 |
-| waterproof_contact_pulse | 030338FF | 防水防塵接点パルスユニット | 2ZS |
-| waterproof_analog_output | 030339FF | 防水防塵アナログ出力無線化ユニット | 2ZU |
+「対応」は `SENSOR_TYPE` への登録と解析クラスの存在を意味します。実電文による主要値の自動テスト済みかどうかは `parse_verified` 列（および `get_supported_sensors()` の同名フィールド）で区別します。
+
+| センサータイプ | センサーコード | 説明 | 製品例 | parse_verified |
+|-------------|-------------|------|--------|----------------|
+| temperature_and_humidity | 030301FF | 温湿度センサー | 1AN | 済み |
+| thermocouple | 030307FF | 3温度/熱電対センサー | 1EM/1PF | 済み |
+| current_pulse | 030310FF | 電流・パルスセンサー | 1MU | 未 |
+| voltage_pulse | 030313FF | 電圧・パルスセンサー | 1RU | 未 |
+| CT | 030312FF | CTセンサー | 1MT/1NT | 未 |
+| vibration | 03030900, 03030901 | 振動センサー（加速度） | 1LZ | 済み |
+| vibration_speed | 03031800, 03031801 | 振動センサー（速度） | 1TF | 未 |
+| 3_current | 03031BFF | 防水3電流センサー | 1ZU | 済み |
+| 3_voltage | 03031CFF | 防水3電圧センサー | 1ZV | 済み |
+| 3_contacts | 03031DFF | 防水3接点センサー | 1ZS | 済み |
+| water_leak | 03031EFF | 漏水センサー | 2AX | 未 |
+| waterproof_repeater | 0303FEFF | 防水中継機 | 2CL | 済み |
+| plg_duty | 030319FF | PLG Duty比監視ユニット | 2AU | 未 |
+| brake_current_monitor | 03032600 | 無線ブレーキ電流監視ユニット | 2DB | 未 |
+| vibration_with_instruction | 03032B00, 03032B01 | 計測指示機能付振動センサー | 2DN | 未 |
+| compact_thermocouple | 030331FF | 小型熱電対ユニット | 2FW | 未 |
+| solar_external_sensor | 03033AFF, 03033A00, 03033A02 | 外部センサ用ソーラーユニット | 2SL | 未 |
+| contact_output | 030330FF | 接点出力ユニット | 2ST | 未 |
+| analog_meter_reader | 030333FF | アナログメーター読取ユニット | 2YT | 未 |
+| vibration_2tf001_speed | 03032F00, 03032F01 | 振動 2TF-001 速度モード/低速回転モード | 2TF-001 | 未 |
+| vibration_2tf001_accel | 03033200, 03033201 | 振動 2TF-001 加速度モード | 2TF-001 | 未 |
+| waterproof_contact_pulse | 030338FF | 防水防塵接点パルスユニット | 2ZS | 済み |
+| waterproof_analog_output | 030339FF | 防水防塵アナログ出力無線化ユニット | 2ZU | 済み |
+
+`parse_verified` が「未」のタイプも受信・型判定・クラス生成は可能ですが、主要 values の自動テストが未整備です。本番で厳密に保証したい場合は「済み」タイプを優先するか、実機電文での確認を推奨します。（実機を保有していないため、正式なテストができていません。）
 
 対応済みセンサー一覧はAPIからも取得できます。設定画面や診断表示など、利用アプリ側で対応範囲を表示したい場合に使用します。
 
@@ -206,7 +210,12 @@ thread = receiver.run_in_thread()
 from murata_sensor import get_supported_sensors
 
 for sensor in get_supported_sensors():
-    print(sensor["sensor_type"], sensor["type_codes"], sensor["products"])
+    print(
+        sensor["sensor_type"],
+        sensor["type_codes"],
+        sensor["products"],
+        sensor["parse_verified"],
+    )
 ```
 
 ## 解析結果のデータ構造
@@ -350,14 +359,15 @@ print(result["info"])              # MurataSensorBase.info と同等の情報
 #### コンストラクタ
 
 ```python
-MurataReceiver(port, buffer_size=1024, data_callback=None, error_callback=None, logger=None)
+MurataReceiver(port, buffer_size=1024, data_callback=None, error_callback=None, unparsed_callback=None, logger=None)
 ```
 
 **パラメータ:**
 - `port` (int): リッスンするUDPポート番号
 - `buffer_size` (int, optional): 受信バッファサイズ（デフォルト: 1024）
 - `data_callback` (callable, optional): センサーデータのコールバック関数
-- `error_callback` (callable, optional): エラー処理のコールバック関数
+- `error_callback` (callable, optional): 受信ループ／コールバック内例外向けのコールバック関数
+- `unparsed_callback` (callable, optional): 未解析データ受信時のコールバック関数
 - `logger` (logging.Logger, optional): カスタムロガーインスタンス
 
 #### メソッド
@@ -383,12 +393,23 @@ def data_callback(sensor_data: dict, addr: tuple) -> None:
     Args:
         sensor_data (dict): 処理済みセンサーデータ（以下の構造）:
             {
-                'sensor_type': str,      # センサータイプ名
-                'timestamp': str,        # ISO形式のタイムスタンプ
-                'values': dict,          # センサー固有の値
-                'info': dict,           # センサー情報（RSSI、ユニットIDなど）
-                'addr': tuple           # 送信元アドレス（ip, port）
+                'sensor_type': str,         # センサータイプ名
+                'sensor_type_code': str,    # センサ種別コード [tt]（16進2桁）
+                'timestamp': str,           # ISO形式のタイムスタンプ
+                'values': dict,             # センサー固有の値
+                'info': dict,               # センサー情報（RSSI、ユニットIDなど）
+                'addr': tuple               # 送信元アドレス（ip, port）
             }
+        addr (tuple): 送信元アドレス（ip_address, port）
+    """
+```
+
+#### 未解析コールバック
+```python
+def unparsed_callback(unparsed_data: dict, addr: tuple) -> None:
+    """
+    Args:
+        unparsed_data (dict): 未解析データ（reason / raw_data / sensor_type_code など）
         addr (tuple): 送信元アドレス（ip_address, port）
     """
 ```
@@ -398,7 +419,7 @@ def data_callback(sensor_data: dict, addr: tuple) -> None:
 def error_callback(error: Exception, raw_data: bytes, addr: tuple) -> None:
     """
     Args:
-        error (Exception): 発生した例外
+        error (Exception): 発生した例外（主に受信ループ／data_callback 内）
         raw_data (bytes): 生のUDPパケットデータ
         addr (tuple): 送信元アドレス（ip_address, port）
     """
@@ -411,8 +432,14 @@ asyncio 対応の非同期 UDP 受信クラス。`async for` でセンサーデ�
 #### コンストラクタ
 
 ```python
-AsyncMurataReceiver(port, buffer_size=1024, logger=None)
+AsyncMurataReceiver(port, buffer_size=1024, logger=None, include_unparsed=False)
 ```
+
+**パラメータ:**
+- `port` (int): 受信ポート番号
+- `buffer_size` (int, optional): 受信バッファサイズ（デフォルト: 1024）
+- `logger` (logging.Logger, optional): カスタムロガー
+- `include_unparsed` (bool, optional): True の場合、未解析データもイテレーションで返す
 
 #### メソッド
 
@@ -454,18 +481,28 @@ AsyncMurataReceiver(port, buffer_size=1024, logger=None)
 - `FailedCheckSumPayload`: ペイロードのチェックサム検証失敗
 - `MurataExceptionBase`: すべての村田センサー関連エラーの基底例外
 
+チェックサム不正などの未解析データは `unparsed_callback` で受け取ります（`reason: checksum_error` など）。
+`error_callback` は受信ループや `data_callback` 内で発生した例外向けです。
+
 ```python
 from murata_sensor import MurataReceiver, FailedCheckSum, FailedCheckSumPayload
 
-def error_handler(error, raw_data, addr):
-    if isinstance(error, FailedCheckSum):
+def on_unparsed(unparsed_data, addr):
+    if unparsed_data["reason"] == "checksum_error":
         print(f"Checksum error from {addr}")
-    elif isinstance(error, FailedCheckSumPayload):
+    elif unparsed_data["reason"] == "payload_checksum_error":
         print(f"Payload checksum error from {addr}")
     else:
-        print(f"Unknown error from {addr}: {error}")
+        print(f"Unparsed from {addr}: {unparsed_data['reason']}")
 
-receiver = MurataReceiver(port=55039, error_callback=error_handler)
+def error_handler(error, raw_data, addr):
+    print(f"Receiver/callback error from {addr}: {error}")
+
+receiver = MurataReceiver(
+    port=55039,
+    unparsed_callback=on_unparsed,
+    error_callback=error_handler,
+)
 ```
 
 ## ドキュメント
@@ -493,7 +530,7 @@ pip install -e ".[dev]"
 # テスト実行
 pytest
 
-# コードフォーマット
+# コードフォーマット / Lint
 black src/murata_sensor/
 flake8 src/ tests/
 

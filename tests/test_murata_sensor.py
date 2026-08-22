@@ -1,8 +1,41 @@
 import asyncio
 import pytest
 from datetime import datetime
+from unittest.mock import patch
+
 from murata_sensor import *
-from murata_sensor.murata_receiver import create_sensor, parse_text_line
+from murata_sensor.murata_receiver import build_sensor_data, create_sensor, parse_text_line
+
+
+def _rebuild_packet_checksums(data: bytearray) -> bytes:
+    """ペイロード／電文チェックサムを再計算して正当な電文にする"""
+    payload_len = int(data[31:33], 16)
+    if payload_len % 8 != 0:
+        payload = data[34 : 34 + payload_len]
+        result = 0
+        for byte in payload[:-2]:
+            result ^= byte
+        data[34 + payload_len - 2 : 34 + payload_len] = format(result, "02X").encode()
+
+    target = bytes(data[: 33 + 1 + payload_len])
+    result = 0
+    for byte in target:
+        result ^= byte
+    cs_start = 33 + payload_len + 1
+    data[cs_start : cs_start + 2] = format(result, "02X").encode()
+    return bytes(data)
+
+
+def _vibration_packet_with_type_code(type_code: bytes) -> bytes:
+    """振動系テスト電文のセンサ種別コード（8文字）を差し替えて返す"""
+    data = bytearray(
+        b"ERXDATA 8001 0000 1012 F000 2A 7A "
+        b"03030900012F0532FFFFFF26FFFFFF0CFFFFFF26FFFFFF0CFFFFFF26FFFFFF0C"
+        b"FFFFFF26FFFFFF0CFFFFFF26FFFFFF0C00000063000000660019002A7170 "
+        b"8001 7FFF"
+    )
+    data[34:42] = type_code
+    return _rebuild_packet_checksums(data)
 
 
 class TestModel(object):
@@ -43,26 +76,26 @@ class TestModel(object):
         sensor = VibrationSensor(c, addr)
 
         # 基本情報のテスト
-        assert sensor.info["addr"] == ("123.456.789.111", 8765)
-        assert sensor.info["unit_id"] == "8001"
-        assert sensor.info["message_id"] == "1012"
+        assert sensor.info['addr'] == ('123.456.789.111', 8765)
+        assert sensor.info['unit_id'] == '8001'
+        assert sensor.info['message_id'] == '1012'
         # RSSI値はデータ位置によって決まる
-        assert "RSSI" in sensor.info
+        assert 'RSSI' in sensor.info
 
         # 値のテスト（キーの存在と値の確認）
-        assert "power-supply-voltage" in sensor.values
-        assert sensor.values["power-supply-voltage"]["value"] == 3.03
-        assert sensor.values["power-supply-voltage"]["unit"] == "V"
+        assert 'power-supply-voltage' in sensor.values
+        assert sensor.values['power-supply-voltage']['value'] == 3.03
+        assert sensor.values['power-supply-voltage']['unit'] == 'V'
 
-        assert "acceleration-RMS" in sensor.values
-        assert sensor.values["acceleration-RMS"]["value"] == 0
+        assert 'acceleration-RMS' in sensor.values
+        assert sensor.values['acceleration-RMS']['value'] == 0
 
-        assert "kurtosis" in sensor.values
-        assert sensor.values["kurtosis"]["value"] == 0
+        assert 'kurtosis' in sensor.values
+        assert sensor.values['kurtosis']['value'] == 0
 
-        assert "temperature" in sensor.values
-        assert sensor.values["temperature"]["value"] == 25
-        assert sensor.values["temperature"]["unit"] == "℃"
+        assert 'temperature' in sensor.values
+        assert sensor.values['temperature']['value'] == 25
+        assert sensor.values['temperature']['unit'] == '℃'
 
     def test_three_temperature_sensor(self):
         """3温度ユニットのテスト"""
@@ -72,17 +105,17 @@ class TestModel(object):
         sensor = ThreeTemperatureSensor(data, addr)
 
         # 基本情報のテスト
-        assert sensor.info["unit_id"] == "0740"
-        assert sensor.info["message_id"] == "392C"
+        assert sensor.info['unit_id'] == '0740'
+        assert sensor.info['message_id'] == '392C'
         # route情報は最後の単語をスプリットした結果
-        assert "route" in sensor.info
-        assert isinstance(sensor.info["route"], list)
+        assert 'route' in sensor.info
+        assert isinstance(sensor.info['route'], list)
 
         # センサー値のテスト
-        assert "power-supply-voltage" in sensor.values
-        assert "temperature1" in sensor.values
-        assert "temperature2" in sensor.values
-        assert "temperature3" in sensor.values
+        assert 'power-supply-voltage' in sensor.values
+        assert 'temperature1' in sensor.values
+        assert 'temperature2' in sensor.values
+        assert 'temperature3' in sensor.values
 
     def test_rssi_calculation(self):
         """RSSI計算のテスト"""
@@ -93,13 +126,13 @@ class TestModel(object):
         sensor = TemperatureAndHumiditySensor(data, addr)
 
         # RSSI値が計算されていることを確認
-        assert "RSSI" in sensor.info
-        assert isinstance(sensor.info["RSSI"], int)
+        assert 'RSSI' in sensor.info
+        assert isinstance(sensor.info['RSSI'], int)
 
     def test_current_pulse_sensor(self):
         """電流・パルスセンサーのテスト（クラス構造の確認）"""
         # CurrentPulseSensorクラスの構造テスト
-        assert hasattr(CurrentPulseSensor, "retrieve_values")
+        assert hasattr(CurrentPulseSensor, 'retrieve_values')
         assert issubclass(CurrentPulseSensor, MurataSensorBase)
 
         # retrieve_valuesで設定されるキーの確認
@@ -113,19 +146,19 @@ class TestModel(object):
         # 有効なテストデータを使用
         data = b"ERXDATA 8001 0000 1012 F000 2A 7A 03030900012F0532FFFFFF26FFFFFF0CFFFFFF26FFFFFF0CFFFFFF26FFFFFF0CFFFFFF26FFFFFF0CFFFFFF26FFFFFF0C00000063000000660019002A7170 8001 7FFF"
         sensor = VibrationSensor(data, addr)
-        assert sensor.info["status"]["code"] == "00"
-        assert sensor.info["status"]["description"] == "正常"
+        assert sensor.info['status']['code'] == '00'
+        assert sensor.info['status']['description'] == '正常'
 
     def test_voltage_pulse_sensor(self):
         """電圧・パルスセンサーのテスト（クラス構造の確認）"""
         # VoltagePulseSensorクラスの構造テスト
-        assert hasattr(VoltagePulseSensor, "retrieve_values")
+        assert hasattr(VoltagePulseSensor, 'retrieve_values')
         assert issubclass(VoltagePulseSensor, MurataSensorBase)
 
     def test_ct_sensor(self):
         """CTセンサーのテスト（クラス構造の確認）"""
         # CTSensorクラスの構造テスト
-        assert hasattr(CTSensor, "retrieve_values")
+        assert hasattr(CTSensor, 'retrieve_values')
         assert issubclass(CTSensor, MurataSensorBase)
 
     def test_three_current_sensor(self):
@@ -136,15 +169,15 @@ class TestModel(object):
         sensor = ThreeCurrentSensor(data, addr)
 
         # 基本情報のテスト
-        assert sensor.info["unit_id"] == "CDEF"
-        assert sensor.info["message_id"] == "351C"
-        assert sensor.info["serial_number"] == "123456FAABCDEFFA"
+        assert sensor.info['unit_id'] == 'CDEF'
+        assert sensor.info['message_id'] == '351C'
+        assert sensor.info['serial_number'] == '123456FAABCDEFFA'
 
         # センサー値のテスト
-        assert sensor.values["power-supply-voltage"]["value"] == 3.04
-        assert sensor.values["current1"]["value"] == 10.9
-        assert sensor.values["current2"]["value"] == 4.8
-        assert sensor.values["current3"]["value"] == 0.0
+        assert sensor.values['power-supply-voltage']['value'] == 3.04
+        assert sensor.values['current1']['value'] == 10.9
+        assert sensor.values['current2']['value'] == 4.8
+        assert sensor.values['current3']['value'] == 0.0
 
     def test_three_voltage_sensor(self):
         """3電圧ユニットのテスト"""
@@ -154,15 +187,15 @@ class TestModel(object):
         sensor = ThreeVoltageSensor(data, addr)
 
         # 基本情報のテスト
-        assert sensor.info["unit_id"] == "CDEF"
-        assert sensor.info["message_id"] == "0042"
-        assert sensor.info["serial_number"] == "123456FAABCDEFFA"
+        assert sensor.info['unit_id'] == 'CDEF'
+        assert sensor.info['message_id'] == '0042'
+        assert sensor.info['serial_number'] == '123456FAABCDEFFA'
 
         # センサー値のテスト
-        assert sensor.values["power-supply-voltage"]["value"] == 3.04
-        assert sensor.values["voltage1"]["value"] == 2.9
-        assert sensor.values["voltage2"]["value"] == 4.8
-        assert sensor.values["voltage3"]["value"] == 0.0
+        assert sensor.values['power-supply-voltage']['value'] == 3.04
+        assert sensor.values['voltage1']['value'] == 2.9
+        assert sensor.values['voltage2']['value'] == 4.8
+        assert sensor.values['voltage3']['value'] == 0.0
 
     def test_three_contact_sensor(self):
         """3接点ユニットのテスト"""
@@ -172,18 +205,18 @@ class TestModel(object):
         sensor = ThreeContactSensor(data, addr)
 
         # 基本情報のテスト
-        assert sensor.info["unit_id"] == "9ABC"
-        assert sensor.info["message_id"] == "5B27"
-        assert sensor.info["serial_number"] == "123456FA789ABCFA"
+        assert sensor.info['unit_id'] == '9ABC'
+        assert sensor.info['message_id'] == '5B27'
+        assert sensor.info['serial_number'] == '123456FA789ABCFA'
 
         # センサー値のキーの存在確認
-        assert "power-supply-voltage" in sensor.values
-        assert "edge1" in sensor.values
-        assert "edge-count1" in sensor.values
-        assert "edge2" in sensor.values
-        assert "edge-count2" in sensor.values
-        assert "edge3" in sensor.values
-        assert "edge-count3" in sensor.values
+        assert 'power-supply-voltage' in sensor.values
+        assert 'edge1' in sensor.values
+        assert 'edge-count1' in sensor.values
+        assert 'edge2' in sensor.values
+        assert 'edge-count2' in sensor.values
+        assert 'edge3' in sensor.values
+        assert 'edge-count3' in sensor.values
 
     def test_waterproof_repeater(self):
         """防水中継機のテスト"""
@@ -193,13 +226,13 @@ class TestModel(object):
         sensor = WaterproofRepeater(data, addr)
 
         # 基本情報のテスト
-        assert sensor.info["unit_id"] == "1234"
-        assert sensor.info["message_id"] == "4485"
-        assert sensor.info["serial_number"] == "000010FA111234FA"
+        assert sensor.info['unit_id'] == '1234'
+        assert sensor.info['message_id'] == '4485'
+        assert sensor.info['serial_number'] == '000010FA111234FA'
 
         # センサー値のテスト
-        assert sensor.values["power-supply-voltage"]["value"] == 3.00
-        assert sensor.values["temperature"]["value"] == 24.0
+        assert sensor.values['power-supply-voltage']['value'] == 3.00
+        assert sensor.values['temperature']['value'] == 24.0
 
 
 class TestCreateSensor:
@@ -214,8 +247,8 @@ class TestCreateSensor:
 
         assert sensor is not None
         assert isinstance(sensor, VibrationSensor)
-        assert sensor.info["unit_id"] == "8001"
-        assert sensor.values["temperature"]["value"] == 25
+        assert sensor.info['unit_id'] == '8001'
+        assert sensor.values['temperature']['value'] == 25
 
     def test_create_sensor_temperature_humidity(self):
         """温湿度センサーの生成テスト"""
@@ -226,7 +259,7 @@ class TestCreateSensor:
 
         assert sensor is not None
         assert isinstance(sensor, TemperatureAndHumiditySensor)
-        assert sensor.info["unit_id"] == "0002"
+        assert sensor.info['unit_id'] == '0002'
 
     def test_create_sensor_without_addr(self):
         """アドレスなしでのセンサー生成テスト"""
@@ -235,7 +268,7 @@ class TestCreateSensor:
         sensor = create_sensor(data)
 
         assert sensor is not None
-        assert sensor.info["addr"] == (None, None)
+        assert sensor.info['addr'] == (None, None)
 
     def test_create_sensor_invalid_data(self):
         """不正なデータでNoneが返されるテスト"""
@@ -264,27 +297,27 @@ class TestParseTextLine:
         result = parse_text_line(line)
 
         # タイムスタンプの検証
-        assert result["timestamp"] == datetime(2024, 9, 20, 16, 26, 11)
+        assert result['timestamp'] == datetime(2024, 9, 20, 16, 26, 11)
 
         # 送信元情報の検証
-        assert result["source_ip"] == "192.168.1.100"
-        assert result["source_port"] == 55061
+        assert result['source_ip'] == '192.168.1.100'
+        assert result['source_port'] == 55061
 
         # センサータイプの検証
-        assert result["sensor_type"] == "vibration"
+        assert result['sensor_type'] == 'vibration'
 
         # センサーオブジェクトの検証
-        assert result["sensor"] is not None
-        assert isinstance(result["sensor"], VibrationSensor)
+        assert result['sensor'] is not None
+        assert isinstance(result['sensor'], VibrationSensor)
 
         # センサー値の検証
-        assert "power-supply-voltage" in result["values"]
-        assert "acceleration-RMS" in result["values"]
-        assert "kurtosis" in result["values"]
-        assert "temperature" in result["values"]
+        assert 'power-supply-voltage' in result['values']
+        assert 'acceleration-RMS' in result['values']
+        assert 'kurtosis' in result['values']
+        assert 'temperature' in result['values']
 
         # info の検証
-        assert result["info"]["unit_id"] == "5438"
+        assert result['info']['unit_id'] == '5438'
 
     def test_parse_erxdata_only(self):
         """ERXDATAのみの文字列のテスト"""
@@ -293,15 +326,15 @@ class TestParseTextLine:
         result = parse_text_line(line)
 
         # タイムスタンプとIPはNone
-        assert result["timestamp"] is None
-        assert result["source_ip"] is None
-        assert result["source_port"] is None
+        assert result['timestamp'] is None
+        assert result['source_ip'] is None
+        assert result['source_port'] is None
 
         # センサータイプの検証
-        assert result["sensor_type"] == "vibration"
+        assert result['sensor_type'] == 'vibration'
 
         # センサーオブジェクトの検証
-        assert result["sensor"] is not None
+        assert result['sensor'] is not None
 
     def test_parse_temperature_humidity(self):
         """温湿度センサーのテキスト行解析テスト"""
@@ -309,8 +342,8 @@ class TestParseTextLine:
 
         result = parse_text_line(line)
 
-        assert result["sensor_type"] == "temperature_and_humidity"
-        assert isinstance(result["sensor"], TemperatureAndHumiditySensor)
+        assert result['sensor_type'] == 'temperature_and_humidity'
+        assert isinstance(result['sensor'], TemperatureAndHumiditySensor)
 
     def test_parse_multiple_lines(self):
         """複数行の解析テスト（実際のログファイル形式）"""
@@ -322,10 +355,10 @@ class TestParseTextLine:
         results = [parse_text_line(line) for line in lines]
 
         assert len(results) == 2
-        assert results[0]["info"]["unit_id"] == "5438"
-        assert results[1]["info"]["unit_id"] == "5448"
-        assert results[0]["timestamp"] == datetime(2024, 9, 20, 16, 26, 11)
-        assert results[1]["timestamp"] == datetime(2024, 9, 20, 16, 28, 13)
+        assert results[0]['info']['unit_id'] == '5438'
+        assert results[1]['info']['unit_id'] == '5448'
+        assert results[0]['timestamp'] == datetime(2024, 9, 20, 16, 26, 11)
+        assert results[1]['timestamp'] == datetime(2024, 9, 20, 16, 28, 13)
 
     def test_parse_empty_line(self):
         """空行でValueErrorが発生するテスト"""
@@ -398,8 +431,8 @@ class TestParseTextLine:
 
         result = parse_text_line(line)
 
-        assert result["raw_data"].startswith(b"ERXDATA")
-        assert b"5438 0000 1E75" in result["raw_data"]
+        assert result['raw_data'].startswith(b"ERXDATA")
+        assert b"5438 0000 1E75" in result['raw_data']
 
     def test_parse_whitespace_handling(self):
         """前後の空白を含む行の処理テスト"""
@@ -407,8 +440,8 @@ class TestParseTextLine:
 
         result = parse_text_line(line)
 
-        assert result["sensor"] is not None
-        assert result["sensor_type"] == "temperature_and_humidity"
+        assert result['sensor'] is not None
+        assert result['sensor_type'] == 'temperature_and_humidity'
 
     def test_parse_checksum_error(self):
         """チェックサムエラーのテスト"""
@@ -552,8 +585,7 @@ class TestMurataReceiverUnit:
     def mock_socket(self, mocker=None):
         """モック化されたソケットを提供"""
         import unittest.mock as mock
-
-        with mock.patch("socket.socket") as mock_sock:
+        with mock.patch('socket.socket') as mock_sock:
             yield mock_sock
 
     def test_receiver_initialization(self):
@@ -561,7 +593,7 @@ class TestMurataReceiverUnit:
         import unittest.mock as mock
         from murata_sensor.murata_receiver import MurataReceiver
 
-        with mock.patch("socket.socket"):
+        with mock.patch('socket.socket'):
             receiver = MurataReceiver(55039)
 
             assert receiver.port == 55039
@@ -576,7 +608,7 @@ class TestMurataReceiverUnit:
         import unittest.mock as mock
         from murata_sensor.murata_receiver import MurataReceiver
 
-        with mock.patch("socket.socket"):
+        with mock.patch('socket.socket'):
             receiver = MurataReceiver(55039, buffer_size=2048)
             assert receiver.buffer_size == 2048
 
@@ -594,12 +626,12 @@ class TestMurataReceiverUnit:
         def unparsed_cb(data, addr):
             pass
 
-        with mock.patch("socket.socket"):
+        with mock.patch('socket.socket'):
             receiver = MurataReceiver(
                 55039,
                 data_callback=data_cb,
                 unparsed_callback=unparsed_cb,
-                error_callback=error_cb,
+                error_callback=error_cb
             )
             assert receiver.data_callback == data_cb
             assert receiver.unparsed_callback == unparsed_cb
@@ -610,7 +642,7 @@ class TestMurataReceiverUnit:
         import unittest.mock as mock
         from murata_sensor.murata_receiver import MurataReceiver
 
-        with mock.patch("socket.socket"):
+        with mock.patch('socket.socket'):
             receiver = MurataReceiver(55039)
 
             data = b"ERXDATA 0002 0000 62BE F000 18 20 030301FF012605320C90052A11AF052C7C0002 7FFF"
@@ -626,7 +658,7 @@ class TestMurataReceiverUnit:
         import unittest.mock as mock
         from murata_sensor.murata_receiver import MurataReceiver
 
-        with mock.patch("socket.socket"):
+        with mock.patch('socket.socket'):
             receiver = MurataReceiver(55039)
 
             invalid_data = b"INVALID DATA"
@@ -641,7 +673,7 @@ class TestMurataReceiverUnit:
         import unittest.mock as mock
         from murata_sensor.murata_receiver import MurataReceiver
 
-        with mock.patch("socket.socket"):
+        with mock.patch('socket.socket'):
             receiver = MurataReceiver(55039)
 
             data = b"ERXDATA 0002 0000 62BE F000 18 20 030399FF012605320C90052A11AF052C7C0002 7FFF"
@@ -656,7 +688,7 @@ class TestMurataReceiverUnit:
         import unittest.mock as mock
         from murata_sensor.murata_receiver import MurataReceiver, SensorData
 
-        with mock.patch("socket.socket"):
+        with mock.patch('socket.socket'):
             receiver = MurataReceiver(55039)
 
             data = b"ERXDATA 0002 0000 62BE F000 18 20 030301FF012605320C90052A11AF052C7C0002 7FFF"
@@ -675,7 +707,7 @@ class TestMurataReceiverUnit:
         import unittest.mock as mock
         from murata_sensor.murata_receiver import MurataReceiver
 
-        with mock.patch("socket.socket"):
+        with mock.patch('socket.socket'):
             receiver = MurataReceiver(55039)
 
             addr = ("192.168.1.100", 55061)
@@ -688,7 +720,7 @@ class TestMurataReceiverUnit:
         import unittest.mock as mock
         from murata_sensor.murata_receiver import MurataReceiver, SensorData
 
-        with mock.patch("socket.socket"):
+        with mock.patch('socket.socket'):
             receiver = MurataReceiver(55039)
 
             data = b"ERXDATA 0002 0000 62BE F000 18 20 030301FF012605320C90052A11AF052C7C0002 7FFF"
@@ -707,7 +739,7 @@ class TestMurataReceiverUnit:
         import unittest.mock as mock
         from murata_sensor.murata_receiver import MurataReceiver
 
-        with mock.patch("socket.socket"):
+        with mock.patch('socket.socket'):
             receiver = MurataReceiver(55039)
 
             addr = ("192.168.1.100", 55061)
@@ -720,7 +752,7 @@ class TestMurataReceiverUnit:
         import unittest.mock as mock
         from murata_sensor.murata_receiver import MurataReceiver
 
-        with mock.patch("socket.socket"):
+        with mock.patch('socket.socket'):
             receiver = MurataReceiver(55039)
 
             data = b"ERXDATA 0002 0000 62BE F000 18 20 030301FF012605320C90052A11AF052C7C0002 7FFF"
@@ -737,7 +769,7 @@ class TestMurataReceiverUnit:
         import unittest.mock as mock
         from murata_sensor.murata_receiver import MurataReceiver
 
-        with mock.patch("socket.socket"):
+        with mock.patch('socket.socket'):
             receiver = MurataReceiver(55039)
 
             data = b"ERXDATA 0002 0000 62BE F000 18 20 030301FF012605320C90052A11AF052C7C0002 7FFF"
@@ -761,7 +793,7 @@ class TestMurataReceiverUnit:
         def data_callback(data, addr):
             callback_called.append((data, addr))
 
-        with mock.patch("socket.socket"):
+        with mock.patch('socket.socket'):
             receiver = MurataReceiver(55039, data_callback=data_callback)
 
             data = b"ERXDATA 0002 0000 62BE F000 18 20 030301FF012605320C90052A11AF052C7C0002 7FFF"
@@ -788,7 +820,7 @@ class TestMurataReceiverUnit:
         def unparsed_callback(data, addr):
             unparsed_callback_called.append((data, addr))
 
-        with mock.patch("socket.socket"):
+        with mock.patch('socket.socket'):
             receiver = MurataReceiver(
                 55039,
                 data_callback=data_callback,
@@ -842,9 +874,11 @@ class TestMurataReceiverUnit:
         def error_callback(exc, data, addr):
             error_callback_called.append((exc, data, addr))
 
-        with mock.patch("socket.socket"):
+        with mock.patch('socket.socket'):
             receiver = MurataReceiver(
-                55039, data_callback=data_callback, error_callback=error_callback
+                55039,
+                data_callback=data_callback,
+                error_callback=error_callback
             )
 
             data = b"ERXDATA 0002 0000 62BE F000 18 20 030301FF012605320C90052A11AF052C7C0002 7FFF"
@@ -864,7 +898,7 @@ class TestMurataReceiverUnit:
 
         custom_logger = logging.getLogger("test_logger")
 
-        with mock.patch("socket.socket"):
+        with mock.patch('socket.socket'):
             receiver = MurataReceiver(55039, logger=custom_logger)
             assert receiver.logger == custom_logger
 
@@ -874,57 +908,100 @@ class TestAdditionalSensorTypes:
 
     def test_vibration_speed_sensor_class_structure(self):
         """VibrationSpeedクラスの構造テスト"""
-        assert hasattr(VibrationSpeed, "retrieve_values")
+        assert hasattr(VibrationSpeed, 'retrieve_values')
         assert issubclass(VibrationSpeed, MurataSensorBase)
 
     def test_water_leak_sensor_class_structure(self):
         """WaterLeakSensorクラスの構造テスト"""
-        assert hasattr(WaterLeakSensor, "retrieve_values")
+        assert hasattr(WaterLeakSensor, 'retrieve_values')
         assert issubclass(WaterLeakSensor, MurataSensorBase)
 
     def test_plg_duty_sensor_class_structure(self):
         """PlgDutySensorクラスの構造テスト"""
-        assert hasattr(PlgDutySensor, "retrieve_values")
+        assert hasattr(PlgDutySensor, 'retrieve_values')
         assert issubclass(PlgDutySensor, MurataSensorBase)
 
     def test_brake_current_monitor_class_structure(self):
         """BrakeCurrentMonitorクラスの構造テスト"""
-        assert hasattr(BrakeCurrentMonitor, "retrieve_values")
+        assert hasattr(BrakeCurrentMonitor, 'retrieve_values')
         assert issubclass(BrakeCurrentMonitor, MurataSensorBase)
 
     def test_vibration_with_instruction_sensor_class_structure(self):
         """VibrationWithInstructionSensorクラスの構造テスト"""
-        assert hasattr(VibrationWithInstructionSensor, "retrieve_values")
+        assert hasattr(VibrationWithInstructionSensor, 'retrieve_values')
         assert issubclass(VibrationWithInstructionSensor, MurataSensorBase)
 
     def test_compact_thermocouple_sensor_class_structure(self):
         """CompactThermocoupleSensorクラスの構造テスト"""
-        assert hasattr(CompactThermocoupleSensor, "retrieve_values")
+        assert hasattr(CompactThermocoupleSensor, 'retrieve_values')
         assert issubclass(CompactThermocoupleSensor, MurataSensorBase)
 
     def test_solar_external_sensor_class_structure(self):
         """SolarExternalSensorクラスの構造テスト"""
-        assert hasattr(SolarExternalSensor, "retrieve_values")
+        assert hasattr(SolarExternalSensor, 'retrieve_values')
         assert issubclass(SolarExternalSensor, MurataSensorBase)
+
+    def test_solar_latitude_longitude_values_convention(self):
+        """Solar 緯度経度が values 規約 {value, unit, unit_name} に従うこと"""
+        sensor = object.__new__(SolarExternalSensor)
+        sensor.values = {}
+        sensor.info = {}
+        # 緯度 35.0deg / 経度 139.0deg（×10000000 の16進）
+        lat_hex = f"{int(35.0 * 10000000):08X}".encode()
+        lon_hex = f"{int(139.0 * 10000000):08X}".encode()
+        sensor.payload = b"0" * 144 + lat_hex + lon_hex + b"0000"
+        assert len(sensor.payload) > 160
+
+        dummy = {"value": 1.0, "unit": "V", "unit_name": "ボルト"}
+        with patch.object(SolarExternalSensor, "_get_value", return_value=dummy):
+            sensor.retrieve_values()
+
+        assert isinstance(sensor.values["latitude"], dict)
+        assert sensor.values["latitude"]["value"] == 35.0
+        assert sensor.values["latitude"]["unit"] == "deg"
+        assert sensor.values["latitude"]["unit_name"] == "度"
+        assert isinstance(sensor.values["longitude"], dict)
+        assert sensor.values["longitude"]["value"] == 139.0
+        assert sensor.values["longitude"]["unit"] == "deg"
+        assert sensor.values["longitude"]["unit_name"] == "度"
+
+        # Sync ログ相当の走査が TypeError にならないこと
+        for key, value in sensor.values.items():
+            assert "value" in value
+            assert "unit" in value
+            _ = f"{value['value']} {value['unit']}"
+
+    def test_solar_short_payload_omits_latitude_longitude(self):
+        """Solar の短いペイロードでは緯度経度キーを出力しないこと"""
+        sensor = object.__new__(SolarExternalSensor)
+        sensor.values = {}
+        sensor.info = {}
+        sensor.payload = b"0" * 136  # <= 160 のため緯度経度なし
+        dummy = {"value": 1.0, "unit": "V", "unit_name": "ボルト"}
+        with patch.object(SolarExternalSensor, "_get_value", return_value=dummy):
+            sensor.retrieve_values()
+
+        assert "latitude" not in sensor.values
+        assert "longitude" not in sensor.values
 
     def test_contact_output_sensor_class_structure(self):
         """ContactOutputSensorクラスの構造テスト"""
-        assert hasattr(ContactOutputSensor, "retrieve_values")
+        assert hasattr(ContactOutputSensor, 'retrieve_values')
         assert issubclass(ContactOutputSensor, MurataSensorBase)
 
     def test_analog_meter_reader_sensor_class_structure(self):
         """AnalogMeterReaderSensorクラスの構造テスト"""
-        assert hasattr(AnalogMeterReaderSensor, "retrieve_values")
+        assert hasattr(AnalogMeterReaderSensor, 'retrieve_values')
         assert issubclass(AnalogMeterReaderSensor, MurataSensorBase)
 
     def test_vibration_2tf001_speed_sensor_class_structure(self):
         """Vibration2TF001SpeedSensorクラスの構造テスト"""
-        assert hasattr(Vibration2TF001SpeedSensor, "retrieve_values")
+        assert hasattr(Vibration2TF001SpeedSensor, 'retrieve_values')
         assert issubclass(Vibration2TF001SpeedSensor, MurataSensorBase)
 
     def test_vibration_2tf001_accel_sensor_class_structure(self):
         """Vibration2TF001AccelSensorクラスの構造テスト"""
-        assert hasattr(Vibration2TF001AccelSensor, "retrieve_values")
+        assert hasattr(Vibration2TF001AccelSensor, 'retrieve_values')
         assert issubclass(Vibration2TF001AccelSensor, MurataSensorBase)
 
     def test_sensor_type_mapping_coverage(self):
@@ -933,38 +1010,21 @@ class TestAdditionalSensorTypes:
         from murata_sensor.murata_receiver import SENSOR_CLASSES
 
         for type_code, sensor_type in SENSOR_TYPE.items():
-            assert (
-                sensor_type in SENSOR_CLASSES
-            ), f"Missing class mapping for {sensor_type}"
+            assert sensor_type in SENSOR_CLASSES, f"Missing class mapping for {sensor_type}"
 
     def test_all_sensor_classes_exist_in_receiver(self):
         """全てのセンサークラスがSENSOR_CLASSESに登録されていることを確認"""
         from murata_sensor.murata_receiver import SENSOR_CLASSES
 
         expected_sensor_types = [
-            "vibration",
-            "vibration_speed",
-            "temperature_and_humidity",
-            "thermocouple",
-            "current_pulse",
-            "voltage_pulse",
-            "CT",
-            "3_current",
-            "3_voltage",
-            "3_contacts",
-            "waterproof_repeater",
-            "water_leak",
-            "plg_duty",
-            "brake_current_monitor",
-            "vibration_with_instruction",
-            "compact_thermocouple",
-            "solar_external_sensor",
-            "contact_output",
-            "analog_meter_reader",
-            "vibration_2tf001_speed",
-            "vibration_2tf001_accel",
-            "waterproof_contact_pulse",
-            "waterproof_analog_output",
+            "vibration", "vibration_speed", "temperature_and_humidity",
+            "thermocouple", "current_pulse", "voltage_pulse", "CT",
+            "3_current", "3_voltage", "3_contacts", "waterproof_repeater",
+            "water_leak", "plg_duty", "brake_current_monitor",
+            "vibration_with_instruction", "compact_thermocouple",
+            "solar_external_sensor", "contact_output", "analog_meter_reader",
+            "vibration_2tf001_speed", "vibration_2tf001_accel",
+            "waterproof_contact_pulse", "waterproof_analog_output"
         ]
 
         for sensor_type in expected_sensor_types:
@@ -975,14 +1035,18 @@ class TestAdditionalSensorTypes:
         from murata_sensor.murata_sensor import SENSOR_TYPE
 
         sensors = get_supported_sensors()
-        supported_codes = {code for sensor in sensors for code in sensor["type_codes"]}
+        supported_codes = {
+            code for sensor in sensors for code in sensor["type_codes"]
+        }
 
         assert isinstance(sensors, tuple)
         assert supported_codes == set(SENSOR_TYPE.keys())
 
     def test_get_supported_sensors_groups_same_sensor_type_codes(self):
         """同じセンサータイプの複数コードが1件に集約されることを確認"""
-        sensors = {sensor["sensor_type"]: sensor for sensor in get_supported_sensors()}
+        sensors = {
+            sensor["sensor_type"]: sensor for sensor in get_supported_sensors()
+        }
 
         assert sensors["vibration"]["type_codes"] == ("03030900", "03030901")
         assert sensors["solar_external_sensor"]["type_codes"] == (
@@ -1016,6 +1080,65 @@ class TestAdditionalSensorTypes:
         assert fresh_sensors[0]["description"] != "変更された説明"
         assert isinstance(fresh_sensors[0]["type_codes"], tuple)
         assert isinstance(fresh_sensors[0]["products"], tuple)
+
+    def test_sensor_metadata_covers_all_sensor_types(self):
+        """SENSOR_METADATA が SENSOR_TYPE の全タイプをカバーし必須項目が揃うこと"""
+        from murata_sensor.murata_sensor import SENSOR_METADATA, SENSOR_TYPE
+
+        assert set(SENSOR_METADATA.keys()) == set(SENSOR_TYPE.values())
+        for sensor_type, metadata in SENSOR_METADATA.items():
+            assert metadata.get("description"), sensor_type
+            assert metadata.get("products"), sensor_type
+            assert isinstance(metadata.get("parse_verified"), bool), sensor_type
+
+    def test_parse_verified_matches_known_sample_covered_types(self):
+        """実電文で values を検証済みのタイプだけ parse_verified=True であること"""
+        verified = {
+            sensor["sensor_type"]
+            for sensor in get_supported_sensors()
+            if sensor["parse_verified"]
+        }
+        assert verified == {
+            "temperature_and_humidity",
+            "thermocouple",
+            "vibration",
+            "3_current",
+            "3_voltage",
+            "3_contacts",
+            "waterproof_repeater",
+            "waterproof_contact_pulse",
+            "waterproof_analog_output",
+        }
+
+
+class TestBuildSensorData:
+    """Sync/Async 共通の build_sensor_data テスト"""
+
+    def test_build_sensor_data_includes_sensor_type_code_and_keys(self):
+        """解析済みセンサーから共通キー集合と sensor_type_code を返す"""
+        addr = ("192.168.1.100", 55061)
+        data = (
+            b"ERXDATA 0002 0000 62BE F000 18 20 "
+            b"030301FF012605320C90052A11AF052C7C0002 7FFF"
+        )
+        sensor = TemperatureAndHumiditySensor(data, addr)
+
+        sensor_data = build_sensor_data(sensor, addr)
+
+        assert set(sensor_data.keys()) == {
+            "sensor_type",
+            "sensor_type_code",
+            "timestamp",
+            "values",
+            "info",
+            "addr",
+        }
+        assert sensor_data["sensor_type"] == "temperature_and_humidity"
+        assert sensor_data["sensor_type_code"] == "01"
+        assert sensor_data["sensor_type_code"] == sensor.info["sensor_type_code"]
+        assert sensor_data["addr"] == addr
+        assert sensor_data["values"] is sensor.values
+        assert sensor_data["info"] is sensor.info
 
 
 class TestEdgeCases:
@@ -1087,7 +1210,7 @@ class TestEdgeCases:
         data = b"ERXDATA 0002 0000 62BE F000 18 20 030301FF012605320C90052A11AF052C7C0002 7FFF"
         sensor = TemperatureAndHumiditySensor(data, (None, None))
 
-        assert sensor.info["addr"] == (None, None)
+        assert sensor.info['addr'] == (None, None)
 
     def test_sensor_str_representation(self):
         """センサーオブジェクトの文字列表現テスト"""
@@ -1108,8 +1231,8 @@ class TestEdgeCases:
         data = b"ERXDATA 0002 0000 62BE F000 18 20 030301FF012605320C90052A11AF052C7C0002 7FFF"
         sensor = TemperatureAndHumiditySensor(data, addr)
 
-        assert isinstance(sensor.info["route"], list)
-        assert len(sensor.info["route"]) >= 1
+        assert isinstance(sensor.info['route'], list)
+        assert len(sensor.info['route']) >= 1
 
     def test_create_sensor_all_sensor_types(self):
         """create_sensorで全センサータイプが生成できることを確認"""
@@ -1117,14 +1240,14 @@ class TestEdgeCases:
 
         for sensor_type, sensor_class in SENSOR_CLASSES.items():
             assert sensor_class is not None
-            assert hasattr(sensor_class, "retrieve_values")
+            assert hasattr(sensor_class, 'retrieve_values')
 
     def test_parse_text_line_with_colon_in_data(self):
         """データ内にコロンがある場合のテキスト行解析"""
         line = "ERXDATA 0002 0000 62BE F000 18 20 030301FF012605320C90052A11AF052C7C0002 7FFF"
         result = parse_text_line(line)
 
-        assert result["sensor"] is not None
+        assert result['sensor'] is not None
 
     def test_checksum_validation_edge_case(self):
         """チェックサム検証のエッジケース"""
@@ -1151,19 +1274,63 @@ class TestEdgeCases:
         sensor = TemperatureAndHumiditySensor(data, addr)
 
         # 温湿度センサーのステータスコードはFF
-        assert sensor.info["status"]["code"] == "FF"
+        assert sensor.info['status']['code'] == 'FF'
 
     def test_vibration_sensor_range_over_status(self):
-        """振動センサーのレンジオーバー状態テスト（ステータスコードの確認）"""
-        # 振動センサーのステータスコード:
-        # "00" -> 正常
-        # "01" -> レンジオーバー
-        # この確認はセンサー状態解析ロジックのテスト
+        """振動センサー実電文で SS=01 がレンジオーバーになること"""
+        addr = ("192.168.1.100", 1234)
+        data = _vibration_packet_with_type_code(b"03030901")
+        sensor = VibrationSensor(data, addr)
 
-        status_mapping = {"00": "正常", "01": "レンジオーバー"}
+        assert sensor.check_sensor_type(sensor.data) == "vibration"
+        assert sensor.info["status"] == {
+            "code": "01",
+            "description": "レンジオーバー",
+        }
+        # Sync/Async 共通経路でも status が保持されること
+        sensor_data = build_sensor_data(sensor, addr)
+        assert sensor_data["info"]["status"]["description"] == "レンジオーバー"
+        assert sensor_data["sensor_type_code"] == "09"
 
-        assert status_mapping["00"] == "正常"
-        assert status_mapping["01"] == "レンジオーバー"
+    def test_vibration_family_status_parsing(self):
+        """振動系タイプ全体で実電文経路の SS=00/01 が正常/レンジオーバーになること"""
+        from murata_sensor.murata_receiver import SENSOR_CLASSES
+
+        addr = ("192.168.1.100", 1234)
+        cases = [
+            (b"03030900", "vibration", "正常"),
+            (b"03030901", "vibration", "レンジオーバー"),
+            (b"03031800", "vibration_speed", "正常"),
+            (b"03031801", "vibration_speed", "レンジオーバー"),
+            (b"03032B00", "vibration_with_instruction", "正常"),
+            (b"03032B01", "vibration_with_instruction", "レンジオーバー"),
+            (b"03032F00", "vibration_2tf001_speed", "正常"),
+            (b"03032F01", "vibration_2tf001_speed", "レンジオーバー"),
+            (b"03033200", "vibration_2tf001_accel", "正常"),
+            (b"03033201", "vibration_2tf001_accel", "レンジオーバー"),
+        ]
+        for type_code, sensor_type, description in cases:
+            cls = SENSOR_CLASSES[sensor_type]
+            # ペイロード形状差による値解析失敗を避け、状態解析経路を検証する
+            with patch.object(cls, "retrieve_values", lambda self: None):
+                sensor = cls(_vibration_packet_with_type_code(type_code), addr)
+            assert sensor.info["status"] == {
+                "code": type_code[6:8].decode(),
+                "description": description,
+            }, type_code.decode()
+
+    def test_vibration_status_types_match_sensor_type_codes(self):
+        """_VIBRATION_STATUS_TYPES が SENSOR_TYPE の振動系と一致すること"""
+        from murata_sensor.murata_sensor import SENSOR_TYPE
+
+        expected = {
+            sensor_type
+            for code, sensor_type in SENSOR_TYPE.items()
+            if (code.endswith("00") or code.endswith("01"))
+            and sensor_type.startswith("vibration")
+        }
+        # brake_current_monitor など vibration 以外の *00 は除外済み
+        assert MurataSensorBase._VIBRATION_STATUS_TYPES == expected
 
     def test_invalid_timestamp_format(self):
         """不正なタイムスタンプ形式のテスト"""
@@ -1171,8 +1338,8 @@ class TestEdgeCases:
         result = parse_text_line(line)
 
         # タイムスタンプはNoneになるが、センサーデータは解析される
-        assert result["timestamp"] is None
-        assert result["sensor"] is not None
+        assert result['timestamp'] is None
+        assert result['sensor'] is not None
 
     def test_invalid_ip_port_format(self):
         """不正なIP/ポート形式のテスト"""
@@ -1180,8 +1347,8 @@ class TestEdgeCases:
         result = parse_text_line(line)
 
         # IPアドレスはNoneになるが、センサーデータは解析される
-        assert result["source_ip"] is None
-        assert result["sensor"] is not None
+        assert result['source_ip'] is None
+        assert result['sensor'] is not None
 
 
 class TestIntegration:
@@ -1192,7 +1359,7 @@ class TestIntegration:
         import unittest.mock as mock
         from murata_sensor.murata_receiver import MurataReceiver
 
-        with mock.patch("socket.socket"):
+        with mock.patch('socket.socket'):
             receiver = MurataReceiver(55039)
 
             # 異なるアドレスから複数のセンサーデータを受信
@@ -1211,9 +1378,7 @@ class TestIntegration:
             assert len(receiver.sensors) == 2
             assert addr1 in receiver.sensors
             assert addr2 in receiver.sensors
-            assert isinstance(
-                receiver.sensors[addr1].sensor, TemperatureAndHumiditySensor
-            )
+            assert isinstance(receiver.sensors[addr1].sensor, TemperatureAndHumiditySensor)
             assert isinstance(receiver.sensors[addr2].sensor, VibrationSensor)
 
     def test_history_accumulation(self):
@@ -1221,7 +1386,7 @@ class TestIntegration:
         import unittest.mock as mock
         from murata_sensor.murata_receiver import MurataReceiver
 
-        with mock.patch("socket.socket"):
+        with mock.patch('socket.socket'):
             receiver = MurataReceiver(55039)
 
             data = b"ERXDATA 0002 0000 62BE F000 18 20 030301FF012605320C90052A11AF052C7C0002 7FFF"
@@ -1243,9 +1408,9 @@ class TestIntegration:
         callback_order = []
 
         def data_callback(data, addr):
-            callback_order.append("data")
+            callback_order.append('data')
 
-        with mock.patch("socket.socket"):
+        with mock.patch('socket.socket'):
             receiver = MurataReceiver(55039, data_callback=data_callback)
 
             data = b"ERXDATA 0002 0000 62BE F000 18 20 030301FF012605320C90052A11AF052C7C0002 7FFF"
@@ -1255,7 +1420,7 @@ class TestIntegration:
             receiver._update_sensor_data(addr, sensor)
             receiver._process_sensor_data(addr, sensor)
 
-            assert "data" in callback_order
+            assert 'data' in callback_order
 
     def test_full_data_flow_with_parse_text_line(self):
         """parse_text_lineを使用した完全なデータフローテスト"""
@@ -1273,15 +1438,15 @@ class TestIntegration:
         assert len(results) == 3
 
         # 最初の2つは振動センサー
-        assert results[0]["sensor_type"] == "vibration"
-        assert results[1]["sensor_type"] == "vibration"
+        assert results[0]['sensor_type'] == 'vibration'
+        assert results[1]['sensor_type'] == 'vibration'
 
         # 3つ目は温湿度センサー
-        assert results[2]["sensor_type"] == "temperature_and_humidity"
+        assert results[2]['sensor_type'] == 'temperature_and_humidity'
 
         # タイムスタンプが正しく解析されていること
-        assert results[0]["timestamp"] == datetime(2024, 9, 20, 16, 26, 11)
-        assert results[2]["timestamp"] == datetime(2024, 9, 20, 16, 30, 0)
+        assert results[0]['timestamp'] == datetime(2024, 9, 20, 16, 26, 11)
+        assert results[2]['timestamp'] == datetime(2024, 9, 20, 16, 30, 0)
 
     def test_create_sensor_with_all_valid_types(self):
         """create_sensorで全ての有効なセンサータイプが生成できることを確認"""
@@ -1295,8 +1460,8 @@ class TestIntegration:
         for data in valid_sensor_data:
             sensor = create_sensor(data, addr)
             assert sensor is not None
-            assert hasattr(sensor, "values")
-            assert hasattr(sensor, "info")
+            assert hasattr(sensor, 'values')
+            assert hasattr(sensor, 'info')
 
     def test_sensor_data_consistency(self):
         """センサーデータの一貫性テスト"""
@@ -1309,15 +1474,15 @@ class TestIntegration:
         # すべてのセンサーが同じ値を持つことを確認
         for i in range(1, len(sensors)):
             assert sensors[0].values == sensors[i].values
-            assert sensors[0].info["unit_id"] == sensors[i].info["unit_id"]
-            assert sensors[0].info["message_id"] == sensors[i].info["message_id"]
+            assert sensors[0].info['unit_id'] == sensors[i].info['unit_id']
+            assert sensors[0].info['message_id'] == sensors[i].info['message_id']
 
     def test_receiver_sensor_replacement(self):
         """センサーデータの置き換えテスト"""
         import unittest.mock as mock
         from murata_sensor.murata_receiver import MurataReceiver
 
-        with mock.patch("socket.socket"):
+        with mock.patch('socket.socket'):
             receiver = MurataReceiver(55039)
 
             addr = ("192.168.1.100", 55061)
@@ -1344,7 +1509,7 @@ class TestIntegration:
         import unittest.mock as mock
         from murata_sensor.murata_receiver import MurataReceiver
 
-        with mock.patch("socket.socket"):
+        with mock.patch('socket.socket'):
             receiver = MurataReceiver(55039)
 
             valid_data = b"ERXDATA 0002 0000 62BE F000 18 20 030301FF012605320C90052A11AF052C7C0002 7FFF"
@@ -1371,7 +1536,7 @@ class TestIntegration:
         import time
         from murata_sensor.murata_receiver import MurataReceiver
 
-        with mock.patch("socket.socket"):
+        with mock.patch('socket.socket'):
             receiver = MurataReceiver(55039)
 
             data = b"ERXDATA 0002 0000 62BE F000 18 20 030301FF012605320C90052A11AF052C7C0002 7FFF"
@@ -1398,7 +1563,6 @@ class TestAsyncMurataReceiver:
 
     def test_async_receiver_start_stop(self):
         """start() と stop() が正常に動作する"""
-
         async def run() -> None:
             receiver = AsyncMurataReceiver(port=0)
             await receiver.start()
@@ -1408,7 +1572,6 @@ class TestAsyncMurataReceiver:
 
     def test_async_receiver_anext_raises_without_start(self):
         """start() 前に __anext__ を呼ぶと RuntimeError"""
-
         async def run() -> None:
             receiver = AsyncMurataReceiver(port=0)
             with pytest.raises(RuntimeError):
@@ -1418,7 +1581,6 @@ class TestAsyncMurataReceiver:
 
     def test_async_receiver_anext_stop_iteration_after_stop(self):
         """stop() がキューに sentinel を入れた後、__anext__ は StopAsyncIteration"""
-
         async def run() -> None:
             receiver = AsyncMurataReceiver(port=0)
             await receiver.start()
@@ -1435,13 +1597,8 @@ class TestAsyncMurataReceiver:
 
     def test_async_receiver_aiter_returns_self(self):
         """__aiter__ が自身を返す"""
-
-        async def run() -> None:
-            # AsyncMurataReceiver.__init__ 内で asyncio.Queue() が作られるためループが必要
-            receiver = AsyncMurataReceiver(port=0)
-            assert receiver.__aiter__() is receiver
-
-        asyncio.run(run())
+        receiver = AsyncMurataReceiver(port=0)
+        assert receiver.__aiter__() is receiver
 
     def test_async_receiver_include_unparsed_queues_unknown_sensor(self):
         """include_unparsed=Trueでは未知センサーをキューへ投入する"""
@@ -1473,19 +1630,14 @@ class TestAsyncMurataReceiver:
         from murata_sensor.async_receiver import _UDPReceiverProtocol
         import logging
 
-        async def run() -> None:
-            queue = asyncio.Queue()
-            protocol = _UDPReceiverProtocol(
-                queue, logging.getLogger("test_async_receiver")
-            )
-            data = b"ERXDATA 0002 0000 62BE F000 18 20 030399FF012605320C90052A11AF052C7C0002 7FFF"
-            addr = ("192.168.1.100", 55061)
+        queue = asyncio.Queue()
+        protocol = _UDPReceiverProtocol(queue, logging.getLogger("test_async_receiver"))
+        data = b"ERXDATA 0002 0000 62BE F000 18 20 030399FF012605320C90052A11AF052C7C0002 7FFF"
+        addr = ("192.168.1.100", 55061)
 
-            protocol.datagram_received(data, addr)
+        protocol.datagram_received(data, addr)
 
-            assert queue.empty()
-
-        asyncio.run(run())
+        assert queue.empty()
 
 
 class TestWaterproofContactPulseSensor:

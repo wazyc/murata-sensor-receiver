@@ -4,28 +4,27 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-## [0.4.0] - 2026-05-01
+## [1.0.0] - 2026-08-22
+
+### Fixed
+- Async 解析済みデータに `sensor_type_code` を追加（Sync と共通の `build_sensor_data`）
+- `SolarExternalSensor` の緯度・経度を values 規約 `{value, unit, unit_name}` に統一
+- 振動系センサータイプ全体で SS=00/01 の状態解析（正常/レンジオーバー）を適用
+- README / API仕様書を実装のコールバック経路・データ形状に合わせて修正
 
 ### Added
-- 対応済みセンサー一覧を取得するメタデータAPI
+- 対応済みセンサー一覧を取得するメタデータAPIを追加
   - `get_supported_sensors()`
   - `get_supported_sensor_types()`
   - `is_supported_sensor_type()`
   - `is_supported_sensor_code()`
-- 未解析データの扱い（UDP受信・テキスト解析・非同期受信）
-  - `MurataReceiver` / `AsyncMurataReceiver` に `unparsed_callback` を追加
-  - 未解析理由の分類（チェックサム不正、非村田形式、未対応センサー種別など）
-  - `build_unparsed_data()` による未解析ペイロード辞書の生成
-  - `parse_text_line(..., strict=False)` で未解析行を辞書として返却可能に
-  - `AsyncMurataReceiver` の `include_unparsed` オプション
+- `get_supported_sensors()` に `parse_verified` を追加し、実電文による値解析の自動テスト済み範囲を明示
 - GitHub Actions による CI（テスト・Lint）
 - flake8 設定ファイル（`.flake8`）
 
 ### Changed
-- ビルド・配布まわりの整理（レガシーなアップロード用スクリプト削除、`MANIFEST.in` の除外設定見直し）
-- README の開発環境セットアップ（flake8 等）を更新
 - README、API仕様書、概要ドキュメント、アーキテクチャ設計書の対応センサー記述を同期
-- 非同期受信のテストで `asyncio.run` を用いたイベントループ管理に統一
+- 対応センサー一覧で「登録済み」と「解析検証済み」を区別して記載
 
 ## [0.3.0] - 2026-04-27
 
@@ -101,4 +100,4 @@ This project adheres to Semantic Versioning:
 
 ---
 
-**Note**: v0.x.x is alpha/beta and the API may change.
+**Note**: v1.0.0 以降は安定版として扱います。破壊的変更がある場合はメジャーバージョンを上げます。
