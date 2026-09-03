@@ -1024,7 +1024,8 @@ class TestAdditionalSensorTypes:
             "vibration_with_instruction", "compact_thermocouple",
             "solar_external_sensor", "contact_output", "analog_meter_reader",
             "vibration_2tf001_speed", "vibration_2tf001_accel",
-            "waterproof_contact_pulse", "waterproof_analog_output"
+            "waterproof_contact_pulse", "waterproof_analog_output",
+            "thermocouple_unit",
         ]
 
         for sensor_type in expected_sensor_types:
@@ -1053,6 +1054,13 @@ class TestAdditionalSensorTypes:
             "03033AFF",
             "03033A00",
             "03033A02",
+            "03033A03",
+        )
+        assert sensors["3_contacts"]["type_codes"] == ("03031DFF", "03031D00")
+        assert sensors["thermocouple_unit"]["type_codes"] == (
+            "03033FFF",
+            "03033F02",
+            "03033F03",
         )
 
     def test_get_supported_sensor_types_matches_receiver_classes(self):
@@ -1108,6 +1116,7 @@ class TestAdditionalSensorTypes:
             "waterproof_repeater",
             "waterproof_contact_pulse",
             "waterproof_analog_output",
+            "thermocouple_unit",
         }
 
 
@@ -1268,13 +1277,58 @@ class TestEdgeCases:
         assert sensor.payload_length == 32
 
     def test_sensor_status_unknown(self):
-        """未知のセンサー状態コードのテスト"""
+        """RFU（FF）のセンサー状態コードのテスト"""
         addr = ("192.168.1.100", 1234)
         data = b"ERXDATA 0002 0000 62BE F000 18 20 030301FF012605320C90052A11AF052C7C0002 7FFF"
         sensor = TemperatureAndHumiditySensor(data, addr)
 
-        # 温湿度センサーのステータスコードはFF
-        assert sensor.info['status']['code'] == 'FF'
+        # 温湿度センサーのステータスコードはFF（RFU）
+        assert sensor.info["status"]["code"] == "FF"
+        assert sensor.info["status"]["description"] == "RFU"
+
+    def test_non_vibration_status_parsing(self):
+        """非振動センサーの共通状態コード解析"""
+        addr = ("192.168.1.100", 1234)
+        cases = [
+            (b"03031D00", "3_contacts", "00", "正常"),
+            (b"03031DFF", "3_contacts", "FF", "RFU"),
+            (b"03033802", "waterproof_contact_pulse", "02", "無線異常"),
+            (b"03033903", "waterproof_analog_output", "03", "センサ異常"),
+            (b"03033A03", "solar_external_sensor", "03", "センサ異常"),
+            (b"03033F02", "thermocouple_unit", "02", "無線異常"),
+        ]
+        from murata_sensor.murata_receiver import SENSOR_CLASSES
+
+        for type_code, sensor_type, code, description in cases:
+            cls = SENSOR_CLASSES[sensor_type]
+            with patch.object(cls, "retrieve_values", lambda self: None):
+                sensor = cls(_vibration_packet_with_type_code(type_code), addr)
+            assert sensor.check_sensor_type(sensor.data) == sensor_type
+            assert sensor.info["status"] == {
+                "code": code,
+                "description": description,
+            }, type_code.decode()
+
+    def test_added_ss_codes_resolve_to_sensor_type(self):
+        """仕様Kで追記したSS変種が同一センサータイプに解決されること"""
+        cases = [
+            (b"03031D00", "3_contacts"),
+            (b"030326FF", "brake_current_monitor"),
+            (b"03033A03", "solar_external_sensor"),
+            (b"03033800", "waterproof_contact_pulse"),
+            (b"03033802", "waterproof_contact_pulse"),
+            (b"03033803", "waterproof_contact_pulse"),
+            (b"03033902", "waterproof_analog_output"),
+            (b"03033903", "waterproof_analog_output"),
+            (b"03033FFF", "thermocouple_unit"),
+            (b"03033F02", "thermocouple_unit"),
+            (b"03033F03", "thermocouple_unit"),
+        ]
+        for type_code, sensor_type in cases:
+            data = _vibration_packet_with_type_code(type_code)
+            assert MurataSensorBase.check_sensor_type(data) == sensor_type, (
+                type_code.decode()
+            )
 
     def test_vibration_sensor_range_over_status(self):
         """振動センサー実電文で SS=01 がレンジオーバーになること"""
@@ -1745,3 +1799,87 @@ class TestWaterproofAnalogOutputSensor:
         """WaterproofAnalogOutputSensorクラスの構造テスト"""
         assert hasattr(WaterproofAnalogOutputSensor, "retrieve_values")
         assert issubclass(WaterproofAnalogOutputSensor, MurataSensorBase)
+
+
+class TestThermocoupleUnitSensor:
+    """熱電対ユニット 2PF のテスト"""
+
+    SAMPLE = (
+        b"ERXDATA D7EE 0000 63C7 F000 53 52 "
+        b"03033FFF01430532000610FA13D7EEFA0000006800EC042A0001006800EE042A"
+        b"00070068FFFFFF2A7C02 D7EE 7FFF"
+    )
+
+    def test_check_sensor_type(self):
+        """センサータイプの識別テスト"""
+        assert MurataSensorBase.check_sensor_type(self.SAMPLE) == "thermocouple_unit"
+
+    def test_create_sensor(self):
+        """create_sensor で ThermocoupleUnitSensor が生成されることを確認"""
+        addr = ("192.168.1.100", 55039)
+        sensor = create_sensor(self.SAMPLE, addr)
+        assert sensor is not None
+        assert isinstance(sensor, ThermocoupleUnitSensor)
+
+    def test_sensor_values(self):
+        """センサー値の解析テスト（仕様書サンプル電文）"""
+        addr = ("192.168.1.100", 55039)
+        sensor = ThermocoupleUnitSensor(self.SAMPLE, addr)
+
+        assert sensor.info["unit_id"] == "D7EE"
+        assert sensor.info["serial_number"] == "000610FA13D7EEFA"
+        assert sensor.info["status"] == {"code": "FF", "description": "RFU"}
+
+        # 電源電圧：0143 (323) × 0.01 = 3.23V
+        assert sensor.values["power-supply-voltage"]["value"] == 3.23
+        assert sensor.values["power-supply-voltage"]["unit"] == "V"
+
+        # 熱電対タイプ: 0=K, 1=J, 7=R
+        assert sensor.values["ch1-thermocouple-type"]["value"] == 0
+        assert sensor.values["ch2-thermocouple-type"]["value"] == 1
+        assert sensor.values["ch3-thermocouple-type"]["value"] == 7
+
+        # 温度: 23.6 / 23.8 / 無効
+        assert sensor.values["ch1-temperature"]["value"] == 23.6
+        assert sensor.values["ch1-temperature"]["unit"] == "℃"
+        assert sensor.values["ch2-temperature"]["value"] == 23.8
+        assert sensor.values["ch3-temperature"]["value"] is None
+
+    def test_sensor_class_structure(self):
+        """ThermocoupleUnitSensorクラスの構造テスト"""
+        assert hasattr(ThermocoupleUnitSensor, "retrieve_values")
+        assert issubclass(ThermocoupleUnitSensor, MurataSensorBase)
+
+
+class TestAnalogMeterReaderUnits:
+    """アナログメーター読取ユニット 2YT の単位訂正テスト"""
+
+    SAMPLE = (
+        b"ERXDATA FF99 0000 418C F000 52 72 "
+        b"030333FF012A0532000610FA12FF99FA0047000B0047000B0047000B002C000B"
+        b"029200610047000B0047000B0047000B002C000B029200617202 FF99 7FFF"
+    )
+
+    def test_unitless_fields_override(self):
+        """角度(Min/Max)と補正値の単位が単位なしになること"""
+        data = _rebuild_packet_checksums(bytearray(self.SAMPLE))
+        addr = ("192.168.1.100", 55039)
+        sensor = AnalogMeterReaderSensor(data, addr)
+
+        assert sensor.values["ch1-angle"]["unit"] == "deg"
+        assert sensor.values["ch1-angle"]["value"] == 71
+        for key in (
+            "ch1-angle-min",
+            "ch1-angle-max",
+            "ch1-correction",
+            "ch2-angle-min",
+            "ch2-angle-max",
+            "ch2-correction",
+        ):
+            assert sensor.values[key]["unit"] == "-", key
+            assert sensor.values[key]["unit_name"] == "単位なし", key
+            assert sensor.values[key]["value"] is not None, key
+
+        assert sensor.values["ch2-angle"]["unit"] == "deg"
+        assert sensor.values["ch1-magnetic-strength"]["unit"] == "-"
+

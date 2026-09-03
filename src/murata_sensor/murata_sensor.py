@@ -18,25 +18,36 @@ SENSOR_TYPE = {
     "03031801": "vibration_speed",  # 振動（速度）レンジオーバー 1TF
     "03031BFF": "3_current",  # 3電流 1ZU
     "03031CFF": "3_voltage",  # 3電圧 1ZV
-    "03031DFF": "3_contacts",  # 3接点 1ZS
+    "03031DFF": "3_contacts",  # 3接点 1ZS（イベント送信）
+    "03031D00": "3_contacts",  # 3接点 1ZS（定期送信）
     "03031EFF": "water_leak",  # 漏水センサ 2AX
     "0303FEFF": "waterproof_repeater",  # 防水中継機 2CL
     "030319FF": "plg_duty",  # PLG Duty比監視ユニット 2AU
-    "03032600": "brake_current_monitor",  # 無線ブレーキ電流監視ユニット 2DB
+    "03032600": "brake_current_monitor",  # 無線ブレーキ電流監視ユニット 2DB（定期送信）
+    "030326FF": "brake_current_monitor",  # 無線ブレーキ電流監視ユニット 2DB（イベント送信）
     "03032B00": "vibration_with_instruction",  # 計測指示機能付無線振動センサユニット 2DN
     "03032B01": "vibration_with_instruction",  # 計測指示機能付無線振動センサユニット 2DN (レンジオーバー)
     "030331FF": "compact_thermocouple",  # 小型熱電対ユニット 2FW
     "03033AFF": "solar_external_sensor",  # 外部センサ用ソーラーユニット 2SL
-    "03033A00": "solar_external_sensor",  # 外部センサ用ソーラーユニット 2SL (接点パルスモード)
-    "03033A02": "solar_external_sensor",  # 外部センサ用ソーラーユニット 2SL (内部エラー)
+    "03033A00": "solar_external_sensor",  # 外部センサ用ソーラーユニット 2SL（定期送信）
+    "03033A02": "solar_external_sensor",  # 外部センサ用ソーラーユニット 2SL（無線異常）
+    "03033A03": "solar_external_sensor",  # 外部センサ用ソーラーユニット 2SL（センサ異常）
     "030330FF": "contact_output",  # 接点出力ユニット 2ST
     "030333FF": "analog_meter_reader",  # アナログメーター読取ユニット 2YT
     "03032F00": "vibration_2tf001_speed",  # 振動 2TF-001（速度モード/低速回転モード）
     "03032F01": "vibration_2tf001_speed",  # 振動 2TF-001（速度モード）レンジオーバー
     "03033200": "vibration_2tf001_accel",  # 振動 2TF-001（加速度モード）
     "03033201": "vibration_2tf001_accel",  # 振動 2TF-001（加速度モード）レンジオーバー
-    "030338FF": "waterproof_contact_pulse",  # 防水防塵接点パルスユニット 2ZS
-    "030339FF": "waterproof_analog_output",  # 防水防塵アナログ出力無線化ユニット 2ZU
+    "030338FF": "waterproof_contact_pulse",  # 防水防塵接点パルスユニット 2ZS（イベント送信）
+    "03033800": "waterproof_contact_pulse",  # 防水防塵接点パルスユニット 2ZS（定期送信）
+    "03033802": "waterproof_contact_pulse",  # 防水防塵接点パルスユニット 2ZS（無線異常）
+    "03033803": "waterproof_contact_pulse",  # 防水防塵接点パルスユニット 2ZS（センサ異常）
+    "030339FF": "waterproof_analog_output",  # 防水防塵アナログ出力無線化ユニット 2ZU（イベント送信）
+    "03033902": "waterproof_analog_output",  # 防水防塵アナログ出力無線化ユニット 2ZU（無線異常）
+    "03033903": "waterproof_analog_output",  # 防水防塵アナログ出力無線化ユニット 2ZU（センサ異常）
+    "03033FFF": "thermocouple_unit",  # 熱電対ユニット 2PF（通常時）
+    "03033F02": "thermocouple_unit",  # 熱電対ユニット 2PF（無線異常）
+    "03033F03": "thermocouple_unit",  # 熱電対ユニット 2PF（センサ異常）
 }
 
 # 対応センサー一覧APIで返す補助情報。
@@ -159,6 +170,11 @@ SENSOR_METADATA = {
     "waterproof_analog_output": {
         "description": "防水防塵アナログ出力無線化ユニット",
         "products": ("2ZU",),
+        "parse_verified": True,
+    },
+    "thermocouple_unit": {
+        "description": "熱電対ユニット",
+        "products": ("2PF",),
         "parse_verified": True,
     },
 }
@@ -417,11 +433,18 @@ class MurataSensorBase(object):
                 "code": status,
                 "description": "正常" if status == "00" else "レンジオーバー",
             }
-        else:
-            return {
-                "code": status,
-                "description": "固定値(FF)" if status == "FF" else "不明な状態",
-            }
+
+        # 共通状態表: 00=正常, 02=無線異常, 03=センサ異常, FF=RFU
+        status_descriptions = {
+            "00": "正常",
+            "02": "無線異常",
+            "03": "センサ異常",
+            "FF": "RFU",
+        }
+        return {
+            "code": status,
+            "description": status_descriptions.get(status, "不明な状態"),
+        }
 
     def _get_value(self, val_hex_text: bytes) -> Dict[str, Any]:
         """ペイロード内の個別のデータを返す
@@ -1041,6 +1064,15 @@ class ContactOutputSensor(MurataSensorBase):
 class AnalogMeterReaderSensor(MurataSensorBase):
     """アナログメーター読取ユニット 2YT"""
 
+    @staticmethod
+    def _as_unitless(value: Dict[str, Any]) -> Dict[str, Any]:
+        """単位コード0Bでも意味上は単位なしの項目向けにunitを上書きする"""
+        return {
+            "value": value["value"],
+            "unit": "-",
+            "unit_name": "単位なし",
+        }
+
     def retrieve_values(self) -> None:
         # 電源電圧：[V]
         self.values["power-supply-voltage"] = self._get_value(self.payload[8:16])
@@ -1050,22 +1082,34 @@ class AnalogMeterReaderSensor(MurataSensorBase):
         self.info["serial_number"] = serial_upper + serial_lower
         # CH1角度：[deg]
         self.values["ch1-angle"] = self._get_value(self.payload[32:40])
-        # CH1角度(Min)：[deg]
-        self.values["ch1-angle-min"] = self._get_value(self.payload[40:48])
-        # CH1角度(Max)：[deg]
-        self.values["ch1-angle-max"] = self._get_value(self.payload[48:56])
-        # CH1補正値：[deg]
-        self.values["ch1-correction"] = self._get_value(self.payload[56:64])
+        # CH1角度(Min)：[-]（単位コードは0Bだが意味上は単位なし）
+        self.values["ch1-angle-min"] = self._as_unitless(
+            self._get_value(self.payload[40:48])
+        )
+        # CH1角度(Max)：[-]
+        self.values["ch1-angle-max"] = self._as_unitless(
+            self._get_value(self.payload[48:56])
+        )
+        # CH1補正値：[-]
+        self.values["ch1-correction"] = self._as_unitless(
+            self._get_value(self.payload[56:64])
+        )
         # CH1磁力強度：[-]
         self.values["ch1-magnetic-strength"] = self._get_value(self.payload[64:72])
         # CH2角度：[deg]
         self.values["ch2-angle"] = self._get_value(self.payload[72:80])
-        # CH2角度(Min)：[deg]
-        self.values["ch2-angle-min"] = self._get_value(self.payload[80:88])
-        # CH2角度(Max)：[deg]
-        self.values["ch2-angle-max"] = self._get_value(self.payload[88:96])
-        # CH2補正値：[deg]
-        self.values["ch2-correction"] = self._get_value(self.payload[96:104])
+        # CH2角度(Min)：[-]
+        self.values["ch2-angle-min"] = self._as_unitless(
+            self._get_value(self.payload[80:88])
+        )
+        # CH2角度(Max)：[-]
+        self.values["ch2-angle-max"] = self._as_unitless(
+            self._get_value(self.payload[88:96])
+        )
+        # CH2補正値：[-]
+        self.values["ch2-correction"] = self._as_unitless(
+            self._get_value(self.payload[96:104])
+        )
         # CH2磁力強度：[-]
         self.values["ch2-magnetic-strength"] = self._get_value(self.payload[104:112])
 
@@ -1202,3 +1246,31 @@ class WaterproofAnalogOutputSensor(MurataSensorBase):
         self.values["voltage3"] = self._get_value(self.payload[72:80])
         # 測定モード
         self.values["measurement-mode"] = self._get_value(self.payload[80:88])
+
+
+class ThermocoupleUnitSensor(MurataSensorBase):
+    """熱電対ユニット 2PF
+
+    熱電対タイプの値（単位なし）:
+    0=K型, 1=J型, 2=T型, 7=R型
+    """
+
+    def retrieve_values(self) -> None:
+        # 電源電圧：[V]
+        self.values["power-supply-voltage"] = self._get_value(self.payload[8:16])
+        # シリアルナンバー
+        serial_upper = self.payload[16:24].decode()
+        serial_lower = self.payload[24:32].decode()
+        self.info["serial_number"] = serial_upper + serial_lower
+        # CH1熱電対タイプ：[-]（0=K, 1=J, 2=T, 7=R）
+        self.values["ch1-thermocouple-type"] = self._get_value(self.payload[32:40])
+        # CH1温度：[℃]
+        self.values["ch1-temperature"] = self._get_value(self.payload[40:48])
+        # CH2熱電対タイプ：[-]
+        self.values["ch2-thermocouple-type"] = self._get_value(self.payload[48:56])
+        # CH2温度：[℃]
+        self.values["ch2-temperature"] = self._get_value(self.payload[56:64])
+        # CH3熱電対タイプ：[-]
+        self.values["ch3-thermocouple-type"] = self._get_value(self.payload[64:72])
+        # CH3温度：[℃]
+        self.values["ch3-temperature"] = self._get_value(self.payload[72:80])

@@ -56,7 +56,7 @@ def on_unparsed(unparsed_data, addr):
     "parsed": False,
     "raw_data": bytes,
     "addr": tuple,
-    "timestamp": str,
+    "timestamp": str,              # ISO8601（デフォルトは受信ホスト時刻）
     "reason": str,                 # unsupported_sensor_type など
     "sensor_type_code": str | None, # センサ種別コード [tt]
     "sensor_message_code": str | None, # 0303[tt][SS]
@@ -212,7 +212,7 @@ def parse_text_line(line: str, strict: bool = True) -> Dict[str, Any]
 ```python
 {
     'parsed': True,
-    'timestamp': datetime,          # 受信タイムスタンプ（なければNone）
+    'timestamp': datetime | None,   # ログ記載時刻（naive）。なければ None。JSON化時は要文字列化
     'source_ip': str,               # 送信元IPアドレス（なければNone）
     'source_port': int,             # 送信元ポート番号（なければNone）
     'sensor': MurataSensorBase,     # 解析済みセンサーオブジェクト
@@ -229,7 +229,7 @@ def parse_text_line(line: str, strict: bool = True) -> Dict[str, Any]
 ```python
 {
     'parsed': False,
-    'timestamp': datetime | str | None,
+    'timestamp': datetime | str | None,  # ログ時刻または生成時刻の str など
     'source_ip': str | None,
     'source_port': int | None,
     'raw_data': bytes,
@@ -240,6 +240,8 @@ def parse_text_line(line: str, strict: bool = True) -> Dict[str, Any]
     'error': Exception | None,
 }
 ```
+
+経路ごとの型の詳細は [timestamp の型（経路別）](#timestamp-の型経路別) を参照する。
 
 **例外:**
 - `ValueError`: 文字列フォーマットが不正な場合（ERXDATAが見つからない等）
@@ -586,6 +588,7 @@ class VibrationSpeed(MurataSensorBase)
 - `Vibration2TF001AccelSensor`: 振動 2TF-001 加速度モード
 - `WaterproofContactPulseSensor`: 防水防塵接点パルスユニット (2ZS)
 - `WaterproofAnalogOutputSensor`: 防水防塵アナログ出力無線化ユニット (2ZU)
+- `ThermocoupleUnitSensor`: 熱電対ユニット (2PF)
 
 ---
 
@@ -627,6 +630,21 @@ class FailedCheckSumPayload(MurataExceptionBase)
 
 ## データ形式
 
+### timestamp の型（経路別）
+
+公開辞書の `timestamp` は経路によって型が異なる。1.x では次の契約を維持する。
+
+| 経路 | `timestamp` の型 | 意味 |
+|------|------------------|------|
+| UDP受信（`build_sensor_data`） | `str`（ISO8601） | 受信ホストの壁時計時刻 |
+| 未解析（`build_unparsed_data` デフォルト） | `str`（ISO8601） | 同上 |
+| `parse_text_line` 成功時 | `datetime \| None`（naive） | ログ行に記載された時刻（なければ `None`） |
+| `parse_text_line(..., strict=False)` 未解析 | `datetime \| str \| None` | ログ時刻が取れた場合は `datetime`、それ以外は生成時刻の `str` など |
+
+組み込み向けの正は ISO8601 文字列である。UDP / 未解析の辞書は標準の `json.dumps` でそのまま直列化できる。`parse_text_line` 成功時の `datetime` を JSON に含める場合は `.isoformat()` などで文字列化すること。
+
+2.0 候補: 公開辞書の `timestamp` をすべて ISO8601 `str` に揃える（`parse_text_line` 成功時の型変更を含む破壊的変更）。
+
 ### センサーデータ辞書
 
 `data_callback` / `AsyncMurataReceiver` のイテレーションで渡される解析済みデータの形式:
@@ -635,7 +653,7 @@ class FailedCheckSumPayload(MurataExceptionBase)
 {
     "sensor_type": "vibration",         # センサータイプ名
     "sensor_type_code": "09",           # センサ種別コード [tt]（16進2桁）
-    "timestamp": "2024-06-13T10:30:00", # ISO形式のタイムスタンプ
+    "timestamp": "2024-06-13T10:30:00", # 受信時刻（ISO8601文字列）
     "values": {                         # センサー値（キー毎に下記形式）
         "temperature": {
             "value": 25.3,
@@ -708,51 +726,62 @@ SENSOR_TYPE = {
     "030310FF": "current_pulse",            # 電流・パルス 1MU
     "030313FF": "voltage_pulse",            # 電圧・パルス 1RU
     "030312FF": "CT",                       # CT 1MT/1NT
-    
+
     # 振動センサー（加速度）
     "03030900": "vibration",                # 振動（加速度） 1LZ
     "03030901": "vibration",                # 振動（加速度）レンジオーバー 1LZ
-    
+
     # 振動センサー（速度）
     "03031800": "vibration_speed",          # 振動（速度） 1TF
     "03031801": "vibration_speed",          # 振動（速度）レンジオーバー 1TF
-    
+
     # 防水防塵対応ユニット
     "03031BFF": "3_current",                # 3電流 1ZU
     "03031CFF": "3_voltage",                # 3電圧 1ZV
-    "03031DFF": "3_contacts",               # 3接点 1ZS
+    "03031DFF": "3_contacts",               # 3接点 1ZS（イベント送信）
+    "03031D00": "3_contacts",               # 3接点 1ZS（定期送信）
     "03031EFF": "water_leak",               # 漏水センサ 2AX
-    
+
     # 中継機・監視ユニット
     "0303FEFF": "waterproof_repeater",      # 防水中継機 2CL
     "030319FF": "plg_duty",                 # PLG Duty比監視ユニット 2AU
-    "03032600": "brake_current_monitor",    # 無線ブレーキ電流監視ユニット 2DB
-    
+    "03032600": "brake_current_monitor",    # 無線ブレーキ電流監視ユニット 2DB（定期送信）
+    "030326FF": "brake_current_monitor",    # 無線ブレーキ電流監視ユニット 2DB（イベント送信）
+
     # 計測指示機能付振動センサー
     "03032B00": "vibration_with_instruction",  # 計測指示機能付無線振動センサユニット 2DN
     "03032B01": "vibration_with_instruction",  # 計測指示機能付無線振動センサユニット 2DN (レンジオーバー)
-    
+
     # 熱電対ユニット
     "030331FF": "compact_thermocouple",     # 小型熱電対ユニット 2FW
-    
+    "03033FFF": "thermocouple_unit",        # 熱電対ユニット 2PF（通常時）
+    "03033F02": "thermocouple_unit",        # 熱電対ユニット 2PF（無線異常）
+    "03033F03": "thermocouple_unit",        # 熱電対ユニット 2PF（センサ異常）
+
     # ソーラーユニット
     "03033AFF": "solar_external_sensor",    # 外部センサ用ソーラーユニット 2SL
-    "03033A00": "solar_external_sensor",    # 外部センサ用ソーラーユニット 2SL (接点パルスモード)
-    "03033A02": "solar_external_sensor",    # 外部センサ用ソーラーユニット 2SL (内部エラー)
-    
+    "03033A00": "solar_external_sensor",    # 外部センサ用ソーラーユニット 2SL（定期送信）
+    "03033A02": "solar_external_sensor",    # 外部センサ用ソーラーユニット 2SL（無線異常）
+    "03033A03": "solar_external_sensor",    # 外部センサ用ソーラーユニット 2SL（センサ異常）
+
     # 接点出力・メーター読取
     "030330FF": "contact_output",           # 接点出力ユニット 2ST
     "030333FF": "analog_meter_reader",      # アナログメーター読取ユニット 2YT
-    
+
     # 振動 2TF-001シリーズ
     "03032F00": "vibration_2tf001_speed",   # 振動 2TF-001（速度モード/低速回転モード）
     "03032F01": "vibration_2tf001_speed",   # 振動 2TF-001（速度モード）レンジオーバー
     "03033200": "vibration_2tf001_accel",   # 振動 2TF-001（加速度モード）
     "03033201": "vibration_2tf001_accel",   # 振動 2TF-001（加速度モード）レンジオーバー
-    
+
     # 防水防塵ユニット
-    "030338FF": "waterproof_contact_pulse", # 防水防塵接点パルスユニット 2ZS
-    "030339FF": "waterproof_analog_output", # 防水防塵アナログ出力無線化ユニット 2ZU
+    "030338FF": "waterproof_contact_pulse", # 防水防塵接点パルスユニット 2ZS（イベント送信）
+    "03033800": "waterproof_contact_pulse", # 防水防塵接点パルスユニット 2ZS（定期送信）
+    "03033802": "waterproof_contact_pulse", # 防水防塵接点パルスユニット 2ZS（無線異常）
+    "03033803": "waterproof_contact_pulse", # 防水防塵接点パルスユニット 2ZS（センサ異常）
+    "030339FF": "waterproof_analog_output", # 防水防塵アナログ出力無線化ユニット 2ZU（イベント送信）
+    "03033902": "waterproof_analog_output", # 防水防塵アナログ出力無線化ユニット 2ZU（無線異常）
+    "03033903": "waterproof_analog_output", # 防水防塵アナログ出力無線化ユニット 2ZU（センサ異常）
 }
 ```
 

@@ -3,7 +3,7 @@
 ## 基本情報
 
 - プロジェクト名: murata-sensor-receiver
-- 目的: 村田製作所製無線センサユニット（電文仕様G対応）からのUDPデータ受信・解析
+- 目的: 村田製作所製無線センサユニット（電文仕様K対応）からのUDPデータ受信・解析
 - ライセンス: MIT
 
 ## このライブラリについて
@@ -168,19 +168,20 @@ murata-sensor-receiver/
 | vibration_speed | 03031800, 03031801 | 振動センサー（速度） | 1TF | 未 |
 | 3_current | 03031BFF | 防水3電流センサー | 1ZU | 済み |
 | 3_voltage | 03031CFF | 防水3電圧センサー | 1ZV | 済み |
-| 3_contacts | 03031DFF | 防水3接点センサー | 1ZS | 済み |
+| 3_contacts | 03031DFF, 03031D00 | 防水3接点センサー | 1ZS | 済み |
 | water_leak | 03031EFF | 漏水センサー | 2AX | 未 |
 | waterproof_repeater | 0303FEFF | 防水中継機 | 2CL | 済み |
 | plg_duty | 030319FF | PLG Duty比監視ユニット | 2AU | 未 |
-| brake_current_monitor | 03032600 | 無線ブレーキ電流監視ユニット | 2DB | 未 |
+| brake_current_monitor | 03032600, 030326FF | 無線ブレーキ電流監視ユニット | 2DB | 未 |
 | vibration_with_instruction | 03032B00, 03032B01 | 計測指示機能付振動センサー | 2DN | 未 |
 | compact_thermocouple | 030331FF | 小型熱電対ユニット | 2FW | 未 |
-| solar_external_sensor | 03033AFF, 03033A00, 03033A02 | 外部センサ用ソーラーユニット | 2SL | 未 |
+| solar_external_sensor | 03033AFF, 03033A00, 03033A02, 03033A03 | 外部センサ用ソーラーユニット | 2SL | 未 |
 | contact_output | 030330FF | 接点出力ユニット | 2ST | 未 |
 | analog_meter_reader | 030333FF | アナログメーター読取ユニット | 2YT | 未 |
 | vibration_2tf001_speed | 03032F00, 03032F01 | 振動 2TF-001 速度モード/低速回転モード | 2TF-001 | 未 |
 | vibration_2tf001_accel | 03033200, 03033201 | 振動 2TF-001 加速度モード | 2TF-001 | 未 |
-| waterproof_contact_pulse | 030338FF | 防水防塵接点パルスユニット | 2ZS | 済み |
-| waterproof_analog_output | 030339FF | 防水防塵アナログ出力無線化ユニット | 2ZU | 済み |
+| waterproof_contact_pulse | 030338FF, 03033800, 03033802, 03033803 | 防水防塵接点パルスユニット | 2ZS | 済み |
+| waterproof_analog_output | 030339FF, 03033902, 03033903 | 防水防塵アナログ出力無線化ユニット | 2ZU | 済み |
+| thermocouple_unit | 03033FFF, 03033F02, 03033F03 | 熱電対ユニット | 2PF | 済み |
 
 対応済みセンサー一覧は `get_supported_sensors()` からも取得できる。詳細なAPIは [api_specification.md](api_specification.md) を参照。
