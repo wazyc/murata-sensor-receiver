@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-07
+
 ### Added
 - 電文仕様K対応: 熱電対ユニット 2PF（`thermocouple_unit` / `ThermocoupleUnitSensor`）
   - `03033FFF` / `03033F02` / `03033F03` を識別

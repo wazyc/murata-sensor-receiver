@@ -101,7 +101,12 @@ asyncio.run(main())
 
 ## 変更履歴
 
-### v1.0.0 (現行)
+### v1.1.0 (現行)
+- **熱電対ユニット 2PF**: 電文仕様K対応（`thermocouple_unit` / `ThermocoupleUnitSensor`）
+- **状態コード**: 非振動センサーの `info.status` を仕様の状態表に合わせて更新
+- **ドキュメント**: 経路別 `timestamp` 型契約、2YT 単位表記、対応電文仕様Kの反映
+
+### v1.0.0
 - **メタデータAPI**: 対応センサー一覧・タイプ判定（`get_supported_sensors` 等）を追加
 - **解析検証フラグ**: `parse_verified` で実電文による値解析の自動テスト済み範囲を明示
 - **不具合修正**: Async の `sensor_type_code`、Solar 緯度経度の values 規約、振動系 SS 状態解析など
