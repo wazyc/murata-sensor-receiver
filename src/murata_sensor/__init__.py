@@ -22,7 +22,7 @@ Text Line Parsing:
     print(result['values'])       # {'power-supply-voltage': {...}, ...}
 """
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __author__ = "Murata Sensor Team"
 __email__ = "sensor-team@example.com"
 __license__ = "MIT"
@@ -61,6 +61,7 @@ from .murata_sensor import (
     Vibration2TF001AccelSensor,
     WaterproofContactPulseSensor,
     WaterproofAnalogOutputSensor,
+    ThermocoupleUnitSensor,
     SENSOR_TYPE,
     UNIT_TYPE,
     get_supported_sensor_types,
@@ -109,6 +110,7 @@ __all__ = [
     "Vibration2TF001AccelSensor",
     "WaterproofContactPulseSensor",
     "WaterproofAnalogOutputSensor",
+    "ThermocoupleUnitSensor",
     # Constants
     "SENSOR_TYPE",
     "UNIT_TYPE",

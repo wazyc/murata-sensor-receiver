@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-07
+
+### Added
+- 電文仕様K対応: 熱電対ユニット 2PF（`thermocouple_unit` / `ThermocoupleUnitSensor`）
+  - `03033FFF` / `03033F02` / `03033F03` を識別
+  - CH1-3 の熱電対タイプと温度を解析（無効値は `None`）
+- 1ZS / 2DB / 2SL / 2ZS / 2ZU の状態コード（SS）変種を `SENSOR_TYPE` に追記
+
+### Changed
+- 対応電文仕様表記を K に更新（README / overview）
+- 非振動センサーの `info.status` を仕様の状態表に合わせて更新
+  - `00`=正常 / `02`=無線異常 / `03`=センサ異常 / `FF`=RFU
+- アナログメーター読取ユニット 2YT の角度(Min/Max)・補正値の単位を単位なし（`-`）に訂正
+- README / API仕様書に経路別の `timestamp` 型契約を追記
+  - UDP / 未解析は ISO8601 `str`（組み込み向けの正）
+  - `parse_text_line` 成功時は naive `datetime | None`（JSON化時は要文字列化）
+
+### Notes (2.0 candidates)
+- 公開辞書の `timestamp` をすべて ISO8601 `str` に揃える
+  - `parse_text_line` 成功時の `datetime` → `str` への変更を含む破壊的変更
+  - 1.x では型変更しない（現行契約を維持）
+
 ## [1.0.0] - 2026-08-22
 
 ### Fixed

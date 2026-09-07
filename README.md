@@ -7,7 +7,7 @@
 
 ## 概要
 
-村田製作所の無線センサユニット（電文仕様I対応）は、UDPパケットでセンサーデータを送信します。
+村田製作所の無線センサユニット（電文仕様K対応）は、UDPパケットでセンサーデータを送信します。
 このライブラリではUDPパケットを受信・解析します。
 
 ## 特徴
@@ -187,20 +187,21 @@ thread = receiver.run_in_thread()
 | vibration_speed | 03031800, 03031801 | 振動センサー（速度） | 1TF | 未 |
 | 3_current | 03031BFF | 防水3電流センサー | 1ZU | 済み |
 | 3_voltage | 03031CFF | 防水3電圧センサー | 1ZV | 済み |
-| 3_contacts | 03031DFF | 防水3接点センサー | 1ZS | 済み |
+| 3_contacts | 03031DFF, 03031D00 | 防水3接点センサー | 1ZS | 済み |
 | water_leak | 03031EFF | 漏水センサー | 2AX | 未 |
 | waterproof_repeater | 0303FEFF | 防水中継機 | 2CL | 済み |
 | plg_duty | 030319FF | PLG Duty比監視ユニット | 2AU | 未 |
-| brake_current_monitor | 03032600 | 無線ブレーキ電流監視ユニット | 2DB | 未 |
+| brake_current_monitor | 03032600, 030326FF | 無線ブレーキ電流監視ユニット | 2DB | 未 |
 | vibration_with_instruction | 03032B00, 03032B01 | 計測指示機能付振動センサー | 2DN | 未 |
 | compact_thermocouple | 030331FF | 小型熱電対ユニット | 2FW | 未 |
-| solar_external_sensor | 03033AFF, 03033A00, 03033A02 | 外部センサ用ソーラーユニット | 2SL | 未 |
+| solar_external_sensor | 03033AFF, 03033A00, 03033A02, 03033A03 | 外部センサ用ソーラーユニット | 2SL | 未 |
 | contact_output | 030330FF | 接点出力ユニット | 2ST | 未 |
 | analog_meter_reader | 030333FF | アナログメーター読取ユニット | 2YT | 未 |
 | vibration_2tf001_speed | 03032F00, 03032F01 | 振動 2TF-001 速度モード/低速回転モード | 2TF-001 | 未 |
 | vibration_2tf001_accel | 03033200, 03033201 | 振動 2TF-001 加速度モード | 2TF-001 | 未 |
-| waterproof_contact_pulse | 030338FF | 防水防塵接点パルスユニット | 2ZS | 済み |
-| waterproof_analog_output | 030339FF | 防水防塵アナログ出力無線化ユニット | 2ZU | 済み |
+| waterproof_contact_pulse | 030338FF, 03033800, 03033802, 03033803 | 防水防塵接点パルスユニット | 2ZS | 済み |
+| waterproof_analog_output | 030339FF, 03033902, 03033903 | 防水防塵アナログ出力無線化ユニット | 2ZU | 済み |
+| thermocouple_unit | 03033FFF, 03033F02, 03033F03 | 熱電対ユニット | 2PF | 済み |
 
 `parse_verified` が「未」のタイプも受信・型判定・クラス生成は可能ですが、主要 values の自動テストが未整備です。本番で厳密に保証したい場合は「済み」タイプを優先するか、実機電文での確認を推奨します。（実機を保有していないため、正式なテストができていません。）
 
@@ -221,7 +222,20 @@ for sensor in get_supported_sensors():
 ## 解析結果のデータ構造
 
 このライブラリは、UDP受信時およびテキスト解析時に、**Pythonの辞書形式**で解析結果を返します。  
-開発者はこの辞書をそのままDB保存・JSON変換・メッセージキュー送信などに利用できます。
+UDP受信および未解析コールバックの辞書は、そのままDB保存・JSON変換・メッセージキュー送信などに利用できます。
+
+### timestamp の型（経路別）
+
+公開辞書の `timestamp` は経路によって型が異なる。1.x では次の契約を維持する。
+
+| 経路 | `timestamp` の型 | 意味 |
+|------|------------------|------|
+| UDP受信（`build_sensor_data`） | `str`（ISO8601） | 受信ホストの壁時計時刻 |
+| 未解析（`build_unparsed_data` デフォルト） | `str`（ISO8601） | 同上 |
+| `parse_text_line` 成功時 | `datetime \| None`（naive） | ログ行に記載された時刻（なければ `None`） |
+| `parse_text_line(..., strict=False)` 未解析 | `datetime \| str \| None` | ログ時刻が取れた場合は `datetime`、それ以外は生成時刻の `str` など |
+
+組み込み向けの正は ISO8601 文字列である。`parse_text_line` の成功結果を JSON 化するときは、`timestamp` が `datetime` の場合に `.isoformat()` などで文字列化すること。
 
 ### UDP受信（MurataReceiver / AsyncMurataReceiver）の例
 
@@ -257,7 +271,7 @@ for sensor in get_supported_sensors():
         "sensor_type_code": "01",               # センサ種別コード（冗長だが info 側にも格納）
         "status": {
             "code": "FF",
-            "description": "固定値(FF)",
+            "description": "RFU",
         },
         "route": ["7FFF"],                      # 経路情報（最後の要素がゲートウェイID）
     },
@@ -338,7 +352,7 @@ print(result["info"])              # MurataSensorBase.info と同等の情報
 
 ```python
 {
-    "timestamp": datetime | None,       # 受信タイムスタンプ（なければ None）
+    "timestamp": datetime | None,       # ログ記載時刻（naive）。なければ None。JSON化時は要文字列化
     "source_ip": str | None,            # 送信元IPアドレス
     "source_port": int | None,          # 送信元ポート番号
     "sensor": MurataSensorBase,         # 解析済みセンサーオブジェクト

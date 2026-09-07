@@ -31,6 +31,7 @@ SENSOR_CLASSES = {
     "vibration_2tf001_accel": Vibration2TF001AccelSensor,
     "waterproof_contact_pulse": WaterproofContactPulseSensor,
     "waterproof_analog_output": WaterproofAnalogOutputSensor,
+    "thermocouple_unit": ThermocoupleUnitSensor,
 }
 
 
