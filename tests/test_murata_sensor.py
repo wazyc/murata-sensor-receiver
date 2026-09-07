@@ -1882,4 +1882,3 @@ class TestAnalogMeterReaderUnits:
 
         assert sensor.values["ch2-angle"]["unit"] == "deg"
         assert sensor.values["ch1-magnetic-strength"]["unit"] == "-"
-
