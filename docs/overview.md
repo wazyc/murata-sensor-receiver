@@ -91,6 +91,7 @@ asyncio.run(main())
 ```
 
 スレッドで受信しながらメイン処理を続ける場合は `MurataReceiver.run_in_thread()` を使用する（サンプル: `examples/threaded_receiver.py`）。
+UDP受信と FastAPI によるデータ提供を同時に行う簡易例は `examples/fastapi_receiver.py` を参照する。
 
 ## 関連ドキュメント
 
@@ -143,6 +144,7 @@ murata-sensor-receiver/
 │   ├── parse_text.py          # テキスト解析
 │   ├── async_receiver.py      # 非同期受信（AsyncMurataReceiver）
 │   ├── async_durable_processing.py  # 長時間・大量受信・DB保存・欠損なし
+│   ├── fastapi_receiver.py        # UDP受信と FastAPI で最新データを返す（簡易）
 │   ├── async_fastapi_receiver.py   # FastAPI と同時に裏で受信
 │   ├── threaded_receiver.py   # スレッド実行（run_in_thread）
 │   ├── callback_closure.py    # コールバック: クロージャ

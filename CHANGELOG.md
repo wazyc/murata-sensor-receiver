@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- サンプル `examples/fastapi_receiver.py`: UDP受信と FastAPI による最新データ提供を同時に行う簡易例
+
+### Fixed
+- Python 3.9 でイベントループ外の `asyncio.Queue()` 生成により失敗していた非同期受信テストを修正
+
 ## [1.1.0] - 2026-09-07
 
 ### Added
