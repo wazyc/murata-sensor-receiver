@@ -2,6 +2,8 @@
 """
 FastAPI と同時に裏でセンサーデータを受信し続けるサンプル
 
+より簡易な例（スレッド受信）は examples/fastapi_receiver.py を参照する
+
 - FastAPI は HTTP API として動作（ヘルスチェック・最新センサー一覧など）
 - バックグラウンドで AsyncMurataReceiver が UDP 受信を継続
 - 受信データはメモリに保持し、API から参照可能

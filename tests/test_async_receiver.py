@@ -73,10 +73,15 @@ def test_datagram_received_parse_error_queues_unparsed_when_enabled():
 
 def test_datagram_received_queue_full_drops_without_raising():
     """キュー満杯時は例外を外へ漏らさずデータを破棄する"""
-    queue = asyncio.Queue(maxsize=1)
-    queue.put_nowait(({"existing": True}, ("127.0.0.1", 1)))
-    protocol = _UDPReceiverProtocol(queue, logging.getLogger("test_async"))
 
-    protocol.datagram_received(VALID_TEMPERATURE_DATA, ("192.168.1.100", 55061))
+    async def run():
+        # Python 3.9 では Queue 生成に実行中のイベントループが必要
+        queue = asyncio.Queue(maxsize=1)
+        queue.put_nowait(({"existing": True}, ("127.0.0.1", 1)))
+        protocol = _UDPReceiverProtocol(queue, logging.getLogger("test_async"))
 
-    assert queue.qsize() == 1
+        protocol.datagram_received(VALID_TEMPERATURE_DATA, ("192.168.1.100", 55061))
+
+        assert queue.qsize() == 1
+
+    asyncio.run(run())

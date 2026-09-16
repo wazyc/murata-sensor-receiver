@@ -139,6 +139,7 @@ receiver.recv()
 
 ### 非同期（asyncio）での使用
 
+FastAPI で最新データを返すだけの簡易例は `examples/fastapi_receiver.py`（`run_in_thread()`）を参照する。
 FastAPI や aiohttp など非同期フレームワークと組み合わせる場合は `AsyncMurataReceiver` を使用する。
 
 ```python
@@ -484,7 +485,8 @@ AsyncMurataReceiver(port, buffer_size=1024, logger=None, include_unparsed=False)
 | [async_receiver.py](./examples/async_receiver.py) | 非同期受信（AsyncMurataReceiver と async for） |
 | [threaded_receiver.py](./examples/threaded_receiver.py) | スレッドで受信（run_in_thread） |
 | [async_durable_processing.py](./examples/async_durable_processing.py) | 長時間稼働・大量受信・DB保存・欠損なし（キュー＋ワーカー） |
-| [async_fastapi_receiver.py](./examples/async_fastapi_receiver.py) | FastAPI と同時に裏で UDP 受信（要: pip install fastapi uvicorn） |
+| [fastapi_receiver.py](./examples/fastapi_receiver.py) | UDP受信と FastAPI で最新データを返す（簡易。要: pip install fastapi uvicorn） |
+| [async_fastapi_receiver.py](./examples/async_fastapi_receiver.py) | FastAPI と AsyncMurataReceiver の同時実行（要: pip install fastapi uvicorn） |
 | [debug_sender.py](./examples/debug_sender.py) | テスト用UDPパケット送信ツール |
 
 ## エラーハンドリング
