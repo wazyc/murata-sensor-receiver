@@ -1025,7 +1025,7 @@ class TestAdditionalSensorTypes:
             "solar_external_sensor", "contact_output", "analog_meter_reader",
             "vibration_2tf001_speed", "vibration_2tf001_accel",
             "waterproof_contact_pulse", "waterproof_analog_output",
-            "thermocouple_unit",
+            "thermocouple_unit", "partial_discharge",
         ]
 
         for sensor_type in expected_sensor_types:
@@ -1062,6 +1062,7 @@ class TestAdditionalSensorTypes:
             "03033F02",
             "03033F03",
         )
+        assert sensors["partial_discharge"]["type_codes"] == ("03032DFF",)
 
     def test_get_supported_sensor_types_matches_receiver_classes(self):
         """対応センサータイプ一覧が生成可能クラスと一致することを確認"""
@@ -1117,6 +1118,7 @@ class TestAdditionalSensorTypes:
             "waterproof_contact_pulse",
             "waterproof_analog_output",
             "thermocouple_unit",
+            "partial_discharge",
         }
 
 
@@ -1213,6 +1215,12 @@ class TestEdgeCases:
         assert UNIT_TYPE["32"]["unit"] == "V"
         assert UNIT_TYPE["2C"]["name"] == "相対湿度"
         assert UNIT_TYPE["2C"]["unit"] == "%RH"
+        assert UNIT_TYPE["29"]["name"] == "数値"
+        assert UNIT_TYPE["29"]["unit"] == "-"
+        assert UNIT_TYPE["65"]["name"] == "ADC出力"
+        assert UNIT_TYPE["65"]["unit"] == "-"
+        assert UNIT_TYPE["95"]["name"] == "割合"
+        assert UNIT_TYPE["95"]["unit"] == "%"
 
     def test_sensor_with_none_addr(self):
         """アドレスがNoneの場合のテスト"""
@@ -1810,6 +1818,72 @@ class TestWaterproofAnalogOutputSensor:
         """WaterproofAnalogOutputSensorクラスの構造テスト"""
         assert hasattr(WaterproofAnalogOutputSensor, "retrieve_values")
         assert issubclass(WaterproofAnalogOutputSensor, MurataSensorBase)
+
+
+class TestPartialDischargeSensor:
+    """無線式部分放電センサ 2TE のテスト"""
+
+    # 仕様サンプル電文（経路付与後にチェックサムを再計算）
+    SAMPLE = _rebuild_packet_checksums(
+        bytearray(
+            b"ERXDATA BAB9 0000 6CF0 F000 54 9A "
+            b"03032DFF01C00532123410FA104342FA01A40026006B0565000C0529"
+            b"00070529001005290002052900100565000B05650012056500070565"
+            b"00080495000604950009049500030495000905650C00 BAB9 7FFF"
+        )
+    )
+
+    def test_check_sensor_type(self):
+        """センサータイプの識別テスト"""
+        assert MurataSensorBase.check_sensor_type(self.SAMPLE) == "partial_discharge"
+
+    def test_create_sensor(self):
+        """create_sensor で PartialDischargeSensor が生成されることを確認"""
+        addr = ("192.168.1.100", 55039)
+        sensor = create_sensor(self.SAMPLE, addr)
+        assert sensor is not None
+        assert isinstance(sensor, PartialDischargeSensor)
+
+    def test_sensor_values(self):
+        """センサー値の解析テスト（仕様書サンプル電文）"""
+        addr = ("192.168.1.100", 55039)
+        sensor = PartialDischargeSensor(self.SAMPLE, addr)
+
+        assert sensor.info["unit_id"] == "BAB9"
+        assert sensor.info["serial_number"] == "123410FA104342FA"
+        assert sensor.info["status"] == {"code": "FF", "description": "RFU"}
+
+        assert sensor.values["power-supply-voltage"]["value"] == 4.48
+        assert sensor.values["power-supply-voltage"]["unit"] == "V"
+
+        assert sensor.values["peak-frequency"]["value"] == 420
+        assert sensor.values["peak-frequency"]["unit"] == "Hz"
+        assert sensor.values["peak-adc"]["value"] == 1.07
+        assert sensor.values["peak-adc"]["unit_name"] == "ADC出力"
+
+        assert sensor.values["adc-ratio-50hz"]["value"] == 0.12
+        assert sensor.values["adc-ratio-60hz"]["value"] == 0.07
+        assert sensor.values["adc-ratio-100hz"]["value"] == 0.16
+        assert sensor.values["adc-ratio-120hz"]["value"] == 0.02
+        assert sensor.values["adc-ratio-50hz"]["unit_name"] == "数値"
+
+        assert sensor.values["adc-50hz"]["value"] == 0.16
+        assert sensor.values["adc-60hz"]["value"] == 0.11
+        assert sensor.values["adc-100hz"]["value"] == 0.18
+        assert sensor.values["adc-120hz"]["value"] == 0.07
+
+        assert sensor.values["ratio-50hz"]["value"] == 0.8
+        assert sensor.values["ratio-60hz"]["value"] == 0.6
+        assert sensor.values["ratio-100hz"]["value"] == 0.9
+        assert sensor.values["ratio-120hz"]["value"] == 0.3
+        assert sensor.values["ratio-50hz"]["unit"] == "%"
+
+        assert sensor.values["peak-frequency-adc-before-noise-cut"]["value"] == 0.09
+
+    def test_sensor_class_structure(self):
+        """PartialDischargeSensorクラスの構造テスト"""
+        assert hasattr(PartialDischargeSensor, "retrieve_values")
+        assert issubclass(PartialDischargeSensor, MurataSensorBase)
 
 
 class TestThermocoupleUnitSensor:
