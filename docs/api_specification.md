@@ -589,6 +589,7 @@ class VibrationSpeed(MurataSensorBase)
 - `WaterproofContactPulseSensor`: 防水防塵接点パルスユニット (2ZS)
 - `WaterproofAnalogOutputSensor`: 防水防塵アナログ出力無線化ユニット (2ZU)
 - `ThermocoupleUnitSensor`: 熱電対ユニット (2PF)
+- `PartialDischargeSensor`: 無線式部分放電センサ (2TE)
 
 ---
 
@@ -751,6 +752,9 @@ SENSOR_TYPE = {
     # 計測指示機能付振動センサー
     "03032B00": "vibration_with_instruction",  # 計測指示機能付無線振動センサユニット 2DN
     "03032B01": "vibration_with_instruction",  # 計測指示機能付無線振動センサユニット 2DN (レンジオーバー)
+
+    # 無線式部分放電センサ
+    "03032DFF": "partial_discharge",        # 無線式部分放電センサ 2TE（通常時）
 
     # 熱電対ユニット
     "030331FF": "compact_thermocouple",     # 小型熱電対ユニット 2FW

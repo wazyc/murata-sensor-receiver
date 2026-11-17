@@ -101,10 +101,14 @@ asyncio.run(main())
 
 ## 変更履歴
 
-### v1.1.0 (現行)
-- **熱電対ユニット 2PF**: 電文仕様K対応（`thermocouple_unit` / `ThermocoupleUnitSensor`）
-- **状態コード**: 非振動センサーの `info.status` を仕様の状態表に合わせて更新
-- **ドキュメント**: 経路別 `timestamp` 型契約、2YT 単位表記、対応電文仕様Kの反映
+### v1.2.0 (現行)
+- 無線式部分放電センサ 2TE（`partial_discharge` / `PartialDischargeSensor`）
+- UNIT_TYPE に ADC出力(65)・割合(95) を追加、数値(29) の名称を訂正
+
+### v1.1.0
+- 熱電対ユニット 2PF（`thermocouple_unit` / `ThermocoupleUnitSensor`）
+- 非振動センサーの `info.status` を仕様の状態表に合わせて更新
+- 経路別 `timestamp` 型契約、2YT 単位表記、対応電文仕様Kの反映
 
 ### v1.0.0
 - **メタデータAPI**: 対応センサー一覧・タイプ判定（`get_supported_sensors` 等）を追加
@@ -179,6 +183,7 @@ murata-sensor-receiver/
 | plg_duty | 030319FF | PLG Duty比監視ユニット | 2AU | 未 |
 | brake_current_monitor | 03032600, 030326FF | 無線ブレーキ電流監視ユニット | 2DB | 未 |
 | vibration_with_instruction | 03032B00, 03032B01 | 計測指示機能付振動センサー | 2DN | 未 |
+| partial_discharge | 03032DFF | 無線式部分放電センサ | 2TE | 済み |
 | compact_thermocouple | 030331FF | 小型熱電対ユニット | 2FW | 未 |
 | solar_external_sensor | 03033AFF, 03033A00, 03033A02, 03033A03 | 外部センサ用ソーラーユニット | 2SL | 未 |
 | contact_output | 030330FF | 接点出力ユニット | 2ST | 未 |

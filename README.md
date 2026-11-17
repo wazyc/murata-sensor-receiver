@@ -193,6 +193,7 @@ thread = receiver.run_in_thread()
 | plg_duty | 030319FF | PLG Duty比監視ユニット | 2AU | 未 |
 | brake_current_monitor | 03032600, 030326FF | 無線ブレーキ電流監視ユニット | 2DB | 未 |
 | vibration_with_instruction | 03032B00, 03032B01 | 計測指示機能付振動センサー | 2DN | 未 |
+| partial_discharge | 03032DFF | 無線式部分放電センサ | 2TE | 済み |
 | compact_thermocouple | 030331FF | 小型熱電対ユニット | 2FW | 未 |
 | solar_external_sensor | 03033AFF, 03033A00, 03033A02, 03033A03 | 外部センサ用ソーラーユニット | 2SL | 未 |
 | contact_output | 030330FF | 接点出力ユニット | 2ST | 未 |

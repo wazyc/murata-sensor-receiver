@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-17
+
+### Added
+- 無線式部分放電センサ 2TE（`partial_discharge` / `PartialDischargeSensor`）
+  - 仕様サンプルに基づき `03032DFF`（通常時）のみを識別（他SS変種は未登録）
+  - ピーク周波数・ADC・各HzのADC/割合/ADC×割合、ノイズカット前ADCを解析
+- `UNIT_TYPE` に `65`（ADC出力）と `95`（割合）を追加
+
+### Changed
+- `UNIT_TYPE` の `29` 名称を「インデックス」から仕様どおり「数値」に訂正
+  - `unit` は従来どおり `"-"`。表示比較は `unit_name` より `unit` を推奨
+
 ## [1.1.0] - 2026-09-07
 
 ### Added

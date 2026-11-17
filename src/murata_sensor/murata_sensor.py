@@ -27,6 +27,7 @@ SENSOR_TYPE = {
     "030326FF": "brake_current_monitor",  # 無線ブレーキ電流監視ユニット 2DB（イベント送信）
     "03032B00": "vibration_with_instruction",  # 計測指示機能付無線振動センサユニット 2DN
     "03032B01": "vibration_with_instruction",  # 計測指示機能付無線振動センサユニット 2DN (レンジオーバー)
+    "03032DFF": "partial_discharge",  # 無線式部分放電センサ 2TE（通常時）
     "030331FF": "compact_thermocouple",  # 小型熱電対ユニット 2FW
     "03033AFF": "solar_external_sensor",  # 外部センサ用ソーラーユニット 2SL
     "03033A00": "solar_external_sensor",  # 外部センサ用ソーラーユニット 2SL（定期送信）
@@ -177,6 +178,11 @@ SENSOR_METADATA = {
         "products": ("2PF",),
         "parse_verified": True,
     },
+    "partial_discharge": {
+        "description": "無線式部分放電センサ",
+        "products": ("2TE",),
+        "parse_verified": True,
+    },
 }
 
 
@@ -232,7 +238,7 @@ UNIT_TYPE = {
     "18": {"name": "時間", "unit": "sec"},
     "1C": {"name": "周期", "unit": "sec"},
     "26": {"name": "周波数", "unit": "Hz"},
-    "29": {"name": "インデックス", "unit": "-"},
+    "29": {"name": "数値", "unit": "-"},
     "2A": {"name": "セルシウス温度", "unit": "℃"},
     "2C": {"name": "相対湿度", "unit": "%RH"},
     "32": {"name": "電位差（電圧）", "unit": "V"},
@@ -240,6 +246,7 @@ UNIT_TYPE = {
     "61": {"name": "磁力強度", "unit": "-"},
     "62": {"name": "電流", "unit": "mA"},
     "63": {"name": "加速度実効値", "unit": "m/s2"},
+    "65": {"name": "ADC出力", "unit": "-"},
     "66": {"name": "尖度", "unit": "-"},
     "68": {"name": "単位なし", "unit": "-"},
     "69": {"name": "電力", "unit": "W"},
@@ -251,6 +258,7 @@ UNIT_TYPE = {
     "74": {"name": "速度実効値", "unit": "mm/s"},
     "80": {"name": "容量パーセント", "unit": "%"},
     "83": {"name": "日数", "unit": "day"},
+    "95": {"name": "割合", "unit": "%"},
     "96": {"name": "高さ", "unit": "m"},
     "FA": {"name": "シリアルNo", "unit": "-"},
     "FE": {"name": "レンジオーバー", "unit": "-"},
@@ -1274,3 +1282,47 @@ class ThermocoupleUnitSensor(MurataSensorBase):
         self.values["ch3-thermocouple-type"] = self._get_value(self.payload[64:72])
         # CH3温度：[℃]
         self.values["ch3-temperature"] = self._get_value(self.payload[72:80])
+
+
+class PartialDischargeSensor(MurataSensorBase):
+    """無線式部分放電センサ 2TE"""
+
+    def retrieve_values(self) -> None:
+        # 電源電圧：[V]
+        self.values["power-supply-voltage"] = self._get_value(self.payload[8:16])
+        # シリアルナンバー
+        serial_upper = self.payload[16:24].decode()
+        serial_lower = self.payload[24:32].decode()
+        self.info["serial_number"] = serial_upper + serial_lower
+        # ピーク周波数：[Hz]（単位26）
+        self.values["peak-frequency"] = self._get_value(self.payload[32:40])
+        # ピークADC値：ADC出力（単位65）
+        self.values["peak-adc"] = self._get_value(self.payload[40:48])
+        # 50HzADC値x割合：数値（単位29）
+        self.values["adc-ratio-50hz"] = self._get_value(self.payload[48:56])
+        # 60HzADC値x割合：数値（単位29）
+        self.values["adc-ratio-60hz"] = self._get_value(self.payload[56:64])
+        # 100HzADC値x割合：数値（単位29）
+        self.values["adc-ratio-100hz"] = self._get_value(self.payload[64:72])
+        # 120HzADC値x割合：数値（単位29）
+        self.values["adc-ratio-120hz"] = self._get_value(self.payload[72:80])
+        # 50HzADC値：ADC出力（単位65）
+        self.values["adc-50hz"] = self._get_value(self.payload[80:88])
+        # 60HzADC値：ADC出力（単位65）
+        self.values["adc-60hz"] = self._get_value(self.payload[88:96])
+        # 100HzADC値：ADC出力（単位65）
+        self.values["adc-100hz"] = self._get_value(self.payload[96:104])
+        # 120HzADC値：ADC出力（単位65）
+        self.values["adc-120hz"] = self._get_value(self.payload[104:112])
+        # 50Hz割合：[%]（単位95）
+        self.values["ratio-50hz"] = self._get_value(self.payload[112:120])
+        # 60Hz割合：[%]（単位95）
+        self.values["ratio-60hz"] = self._get_value(self.payload[120:128])
+        # 100Hz割合：[%]（単位95）
+        self.values["ratio-100hz"] = self._get_value(self.payload[128:136])
+        # 120Hz割合：[%]（単位95）
+        self.values["ratio-120hz"] = self._get_value(self.payload[136:144])
+        # ピーク周波数ノイズカット前ADC値：ADC出力（単位65）
+        self.values["peak-frequency-adc-before-noise-cut"] = self._get_value(
+            self.payload[144:152]
+        )

@@ -32,6 +32,7 @@ SENSOR_CLASSES = {
     "waterproof_contact_pulse": WaterproofContactPulseSensor,
     "waterproof_analog_output": WaterproofAnalogOutputSensor,
     "thermocouple_unit": ThermocoupleUnitSensor,
+    "partial_discharge": PartialDischargeSensor,
 }
 
 
